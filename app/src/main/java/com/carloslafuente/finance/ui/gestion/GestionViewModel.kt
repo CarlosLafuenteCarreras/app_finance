@@ -30,6 +30,7 @@ data class AccountRow(val id: Long, val name: String, val cash: BigDecimal)
 data class PositionRow(
     val assetId: Long,
     val name: String,
+    val isin: String?,
     val quantity: BigDecimal,
     val cost: BigDecimal,
     /** Market value at the latest known price; null when the asset has no price yet. */
@@ -80,14 +81,15 @@ class GestionViewModel(
     ) { accounts, assets, transactions, prices, (refresh, backupMessage) ->
         val ledger = buildLedger(transactions)
         val accountNames = accounts.associate { it.id to it.name }
-        val assetNames = assets.associate { it.id to it.name }
+        val assetsById = assets.associateBy { it.id }
         val latestPrice = prices.associateBy { it.assetId }
         val positions = ledger.lots.map { (assetId, lots) ->
             val quantity = lots.sumOf { it.quantity }
             val price = latestPrice[assetId]
             PositionRow(
                 assetId = assetId,
-                name = assetNames.getValue(assetId),
+                name = assetsById.getValue(assetId).name,
+                isin = assetsById.getValue(assetId).isin,
                 quantity = quantity,
                 cost = lots.sumOf { it.cost },
                 value = price?.let { quantity * it.price },
@@ -104,7 +106,7 @@ class GestionViewModel(
                     id = it.id,
                     date = it.date,
                     type = it.type,
-                    assetName = it.assetId?.let(assetNames::getValue),
+                    assetName = it.assetId?.let { id -> assetsById.getValue(id).name },
                     accountName = accountNames.getValue(it.accountId),
                     cashEffect = it.cashEffect(),
                 )

@@ -30,6 +30,9 @@
 
     <string name="gestion_more_options">Más opciones</string>
 
+    <string name="summary_copy">Copiar resumen para IA</string>
+    <string name="summary_copy_without_amounts">Copiar resumen sin importes</string>
+
     <!-- Backup -->
     <string name="backup_export">Exportar copia de seguridad</string>
     <string name="backup_import">Importar copia de seguridad</string>

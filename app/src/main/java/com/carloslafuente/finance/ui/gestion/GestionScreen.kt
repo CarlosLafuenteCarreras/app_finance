@@ -2,6 +2,8 @@ package com.carloslafuente.finance.ui.gestion
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -82,11 +85,18 @@ fun GestionScreen(
         uri?.let(viewModel::importBackup)
     }
 
+    val context = LocalContext.current
+    fun copySummary(withAmounts: Boolean) {
+        val summary = buildSummary(state, LocalDate.now(), withAmounts)
+        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Finance", summary))
+    }
+
     Box(modifier.fillMaxSize()) {
         Column {
             TotalHeader(
                 state = state,
                 onRefresh = viewModel::refreshPrices,
+                onCopySummary = ::copySummary,
                 onExport = { exportLauncher.launch("finance-backup-${LocalDate.now()}.json") },
                 onImport = { confirmImport = true },
             )
@@ -176,7 +186,13 @@ fun GestionScreen(
 }
 
 @Composable
-private fun TotalHeader(state: GestionUiState, onRefresh: () -> Unit, onExport: () -> Unit, onImport: () -> Unit) {
+private fun TotalHeader(
+    state: GestionUiState,
+    onRefresh: () -> Unit,
+    onCopySummary: (withAmounts: Boolean) -> Unit,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+) {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 24.dp),
@@ -202,6 +218,20 @@ private fun TotalHeader(state: GestionUiState, onRefresh: () -> Unit, onExport: 
                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.gestion_more_options))
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.summary_copy)) },
+                    onClick = {
+                        menuOpen = false
+                        onCopySummary(true)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.summary_copy_without_amounts)) },
+                    onClick = {
+                        menuOpen = false
+                        onCopySummary(false)
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.backup_export)) },
                     onClick = {

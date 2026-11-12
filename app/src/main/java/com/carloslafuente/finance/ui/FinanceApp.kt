@@ -18,8 +18,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.carloslafuente.finance.R
 import com.carloslafuente.finance.ui.gestion.GestionScreen
+import com.carloslafuente.finance.ui.gestion.TransactionFormScreen
 import com.carloslafuente.finance.ui.magia.MagiaScreen
 
 private enum class Tab(@StringRes val label: Int, val icon: ImageVector) {
@@ -27,8 +33,29 @@ private enum class Tab(@StringRes val label: Int, val icon: ImageVector) {
     MAGIA(R.string.tab_magia, Icons.Outlined.AutoAwesome),
 }
 
+private const val HOME = "home"
+const val TRANSACTION_ID_ARG = "transactionId"
+private const val TRANSACTION = "transaction?$TRANSACTION_ID_ARG={$TRANSACTION_ID_ARG}"
+
 @Composable
 fun FinanceApp() {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = HOME) {
+        composable(HOME) {
+            HomeTabs(onOpenTransaction = { id -> navController.navigate("transaction?$TRANSACTION_ID_ARG=$id") })
+        }
+        composable(
+            route = TRANSACTION,
+            arguments = listOf(navArgument(TRANSACTION_ID_ARG) { type = NavType.LongType; defaultValue = 0L }),
+        ) {
+            TransactionFormScreen(onDone = { navController.popBackStack() })
+        }
+    }
+}
+
+/** [onOpenTransaction] receives 0 for a new transaction. */
+@Composable
+private fun HomeTabs(onOpenTransaction: (Long) -> Unit) {
     var selected by rememberSaveable { mutableStateOf(Tab.GESTION) }
     Scaffold(
         bottomBar = {
@@ -45,7 +72,7 @@ fun FinanceApp() {
         },
     ) { innerPadding ->
         when (selected) {
-            Tab.GESTION -> GestionScreen(Modifier.padding(innerPadding))
+            Tab.GESTION -> GestionScreen(onOpenTransaction, Modifier.padding(innerPadding))
             Tab.MAGIA -> MagiaScreen(Modifier.padding(innerPadding))
         }
     }

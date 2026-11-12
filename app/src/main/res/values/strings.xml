@@ -5,9 +5,69 @@
     <string name="tab_gestion">Gestión</string>
     <string name="tab_magia">Magia</string>
 
-    <string name="gestion_empty_title">Tu cartera está vacía</string>
-    <string name="gestion_empty_message">Aquí verás tus cuentas, posiciones y rentabilidad cuando añadas tu primera operación.</string>
+    <!-- Common -->
+    <string name="action_back">Volver</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_accept">Aceptar</string>
+    <string name="action_cancel">Cancelar</string>
 
+    <!-- Gestión -->
+    <string name="gestion_empty_title">Tu cartera está vacía</string>
+    <string name="gestion_empty_message">Pulsa + para añadir tu primera operación. Empieza por un depósito o una compra.</string>
+    <string name="gestion_add_transaction">Añadir operación</string>
+    <string name="gestion_section_accounts">CUENTAS · EFECTIVO</string>
+    <string name="gestion_section_positions">POSICIONES · COSTE</string>
+    <string name="gestion_section_transactions">OPERACIONES</string>
+    <string name="gestion_position_quantity">%1$s participaciones</string>
+    <string name="gestion_oversold_warning">Hay ventas que superan lo que tenía la cuenta en esa fecha. Revisa las operaciones.</string>
+
+    <!-- Transaction types -->
+    <string name="type_buy">Compra</string>
+    <string name="type_sell">Venta</string>
+    <string name="type_dividend">Dividendo</string>
+    <string name="type_interest">Intereses</string>
+    <string name="type_deposit">Depósito</string>
+    <string name="type_withdrawal">Retirada</string>
+    <string name="type_fee">Comisión</string>
+    <string name="type_split">Split</string>
+
+    <!-- Transaction form -->
+    <string name="form_title_new">Nueva operación</string>
+    <string name="form_title_edit">Editar operación</string>
+    <string name="form_account">Cuenta</string>
+    <string name="form_asset">Activo</string>
+    <string name="form_none_selected">sin elegir</string>
+    <string name="form_new_account">Nueva cuenta…</string>
+    <string name="form_new_asset">Nuevo activo…</string>
+    <string name="form_date">Fecha: %1$s</string>
+    <string name="form_quantity">Cantidad</string>
+    <string name="form_split_ratio">Acciones nuevas por cada antigua</string>
+    <string name="form_price">Precio por unidad (€)</string>
+    <string name="form_amount">Importe bruto (€)</string>
+    <string name="form_fee">Comisión (€)</string>
+    <string name="form_tax">Retención (€)</string>
+    <string name="form_note">Nota</string>
+    <string name="form_name">Nombre</string>
+    <string name="form_isin">ISIN (opcional)</string>
+
+    <string name="account_broker">Bróker</string>
+    <string name="account_bank">Banco</string>
+    <string name="asset_stock">Acción</string>
+    <string name="asset_etf">ETF</string>
+    <string name="asset_fund">Fondo</string>
+    <string name="asset_bond">Renta fija</string>
+
+    <string name="error_account">Elige una cuenta.</string>
+    <string name="error_asset">Elige un activo.</string>
+    <string name="error_quantity">La cantidad debe ser un número mayor que cero.</string>
+    <string name="error_price">El precio debe ser un número mayor que cero.</string>
+    <string name="error_amount">El importe debe ser un número mayor que cero.</string>
+    <string name="error_fee">La comisión no es un número válido.</string>
+    <string name="error_tax">La retención no es un número válido.</string>
+    <string name="error_oversold">Con este cambio se vendería más de lo que la cuenta tenía en esa fecha.</string>
+
+    <!-- Magia -->
     <string name="magia_empty_title">Aún no hay magia</string>
     <string name="magia_empty_message">Los análisis con IA llegarán cuando la gestión de la cartera esté lista.</string>
     <string name="magia_disclaimer">Nada de lo que aparece aquí es una recomendación de inversión.</string>

@@ -38,6 +38,19 @@ data class Ledger(
     val oversold: List<Long>,
 )
 
+/** Signed change in the account's cash balance caused by this transaction. */
+fun TransactionEntity.cashEffect(): BigDecimal {
+    val amount = amount ?: BigDecimal.ZERO
+    return when (type) {
+        TransactionType.DEPOSIT -> amount
+        TransactionType.WITHDRAWAL, TransactionType.FEE -> -amount
+        TransactionType.DIVIDEND, TransactionType.INTEREST -> amount - tax
+        TransactionType.BUY -> -(quantity!! * price!! + fee)
+        TransactionType.SELL -> quantity!! * price!! - fee
+        TransactionType.SPLIT -> BigDecimal.ZERO
+    }
+}
+
 fun buildLedger(transactions: List<TransactionEntity>): Ledger {
     val lots = mutableMapOf<Long, ArrayDeque<Lot>>()
     val holdings = mutableMapOf<HoldingKey, BigDecimal>()
@@ -45,16 +58,11 @@ fun buildLedger(transactions: List<TransactionEntity>): Ledger {
     val realized = mutableListOf<RealizedGain>()
     val oversold = mutableListOf<Long>()
 
-    fun addCash(accountId: Long, delta: BigDecimal) {
-        cash[accountId] = (cash[accountId] ?: BigDecimal.ZERO) + delta
-    }
-
     for (tx in transactions.sortedWith(compareBy({ it.date }, { it.id }))) {
-        val amount = tx.amount ?: BigDecimal.ZERO
+        cash[tx.accountId] = (cash[tx.accountId] ?: BigDecimal.ZERO) + tx.cashEffect()
         when (tx.type) {
-            TransactionType.DEPOSIT -> addCash(tx.accountId, amount)
-            TransactionType.WITHDRAWAL, TransactionType.FEE -> addCash(tx.accountId, -amount)
-            TransactionType.DIVIDEND, TransactionType.INTEREST -> addCash(tx.accountId, amount - tx.tax)
+            TransactionType.DEPOSIT, TransactionType.WITHDRAWAL, TransactionType.FEE,
+            TransactionType.DIVIDEND, TransactionType.INTEREST -> Unit
 
             TransactionType.BUY -> {
                 val assetId = tx.assetId!!
@@ -63,7 +71,6 @@ fun buildLedger(transactions: List<TransactionEntity>): Ledger {
                 lots.getOrPut(assetId) { ArrayDeque() }.addLast(Lot(tx.date, quantity, cost))
                 val key = HoldingKey(tx.accountId, assetId)
                 holdings[key] = (holdings[key] ?: BigDecimal.ZERO) + quantity
-                addCash(tx.accountId, -cost)
             }
 
             TransactionType.SELL -> {
@@ -74,7 +81,6 @@ fun buildLedger(transactions: List<TransactionEntity>): Ledger {
                 val held = holdings[key] ?: BigDecimal.ZERO
                 if (held < quantity) oversold += tx.id
                 holdings[key] = held - quantity
-                addCash(tx.accountId, proceeds)
 
                 val queue = lots.getOrPut(assetId) { ArrayDeque() }
                 var remaining = quantity

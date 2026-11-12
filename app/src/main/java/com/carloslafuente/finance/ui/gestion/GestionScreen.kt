@@ -1,5 +1,7 @@
 package com.carloslafuente.finance.ui.gestion
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -14,9 +16,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,16 +74,31 @@ fun GestionScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var pricedPosition by remember { mutableStateOf<PositionRow?>(null) }
+    var confirmImport by remember { mutableStateOf(false) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let(viewModel::exportBackup)
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importBackup)
+    }
 
     Box(modifier.fillMaxSize()) {
-        if (!state.loading && state.transactions.isEmpty()) {
-            EmptyState(
-                title = stringResource(R.string.gestion_empty_title),
-                message = stringResource(R.string.gestion_empty_message),
+        Column {
+            TotalHeader(
+                state = state,
+                onRefresh = viewModel::refreshPrices,
+                onExport = { exportLauncher.launch("finance-backup-${LocalDate.now()}.json") },
+                onImport = { confirmImport = true },
             )
-        } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 88.dp)) {
-                item { TotalHeader(state, onRefresh = viewModel::refreshPrices) }
+            state.backupMessage?.let {
+                Text(stringResource(it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+            if (!state.loading && state.transactions.isEmpty()) {
+                EmptyState(
+                    title = stringResource(R.string.gestion_empty_title),
+                    message = stringResource(R.string.gestion_empty_message),
+                )
+            } else LazyColumn(contentPadding = PaddingValues(bottom = 88.dp)) {
                 if (state.hasOversold) {
                     item { Warning(stringResource(R.string.gestion_oversold_warning)) }
                 }
@@ -126,6 +146,23 @@ fun GestionScreen(
         }
     }
 
+    if (confirmImport) {
+        AlertDialog(
+            onDismissRequest = { confirmImport = false },
+            title = { Text(stringResource(R.string.backup_import_confirm_title)) },
+            text = { Text(stringResource(R.string.backup_import_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmImport = false
+                    importLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/plain"))
+                }) { Text(stringResource(R.string.backup_import)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmImport = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
     pricedPosition?.let { position ->
         ManualPriceDialog(
             assetName = position.name,
@@ -139,7 +176,8 @@ fun GestionScreen(
 }
 
 @Composable
-private fun TotalHeader(state: GestionUiState, onRefresh: () -> Unit) {
+private fun TotalHeader(state: GestionUiState, onRefresh: () -> Unit, onExport: () -> Unit, onImport: () -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -157,6 +195,27 @@ private fun TotalHeader(state: GestionUiState, onRefresh: () -> Unit) {
         } else {
             IconButton(onClick = onRefresh) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.gestion_refresh_prices))
+            }
+        }
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.gestion_more_options))
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.backup_export)) },
+                    onClick = {
+                        menuOpen = false
+                        onExport()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.backup_import)) },
+                    onClick = {
+                        menuOpen = false
+                        onImport()
+                    },
+                )
             }
         }
     }

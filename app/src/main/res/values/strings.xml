@@ -28,6 +28,18 @@
     <string name="gestion_position_quantity">%1$s participaciones</string>
     <string name="gestion_oversold_warning">Hay ventas que superan lo que tenía la cuenta en esa fecha. Revisa las operaciones.</string>
 
+    <string name="gestion_more_options">Más opciones</string>
+
+    <!-- Backup -->
+    <string name="backup_export">Exportar copia de seguridad</string>
+    <string name="backup_import">Importar copia de seguridad</string>
+    <string name="backup_import_confirm_title">¿Importar una copia?</string>
+    <string name="backup_import_confirm_message">Se borrarán todas las cuentas, activos y operaciones actuales y se sustituirán por los del archivo.</string>
+    <string name="backup_exported">Copia de seguridad guardada.</string>
+    <string name="backup_export_failed">No se pudo guardar la copia de seguridad.</string>
+    <string name="backup_imported">Copia de seguridad importada.</string>
+    <string name="backup_import_failed">Ese archivo no es una copia de seguridad válida. No se ha cambiado nada.</string>
+
     <!-- Transaction types -->
     <string name="type_buy">Compra</string>
     <string name="type_sell">Venta</string>

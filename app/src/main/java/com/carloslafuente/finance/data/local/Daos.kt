@@ -13,8 +13,17 @@ interface AccountDao {
     @Query("SELECT * FROM accounts ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<AccountEntity>>
 
+    @Query("SELECT * FROM accounts")
+    suspend fun getAll(): List<AccountEntity>
+
     @Insert
     suspend fun insert(account: AccountEntity): Long
+
+    @Insert
+    suspend fun insertAll(accounts: List<AccountEntity>)
+
+    @Query("DELETE FROM accounts")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -27,6 +36,12 @@ interface AssetDao {
 
     @Insert
     suspend fun insert(asset: AssetEntity): Long
+
+    @Insert
+    suspend fun insertAll(assets: List<AssetEntity>)
+
+    @Query("DELETE FROM assets")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -48,6 +63,12 @@ interface TransactionDao {
 
     @Delete
     suspend fun delete(transaction: TransactionEntity)
+
+    @Insert
+    suspend fun insertAll(transactions: List<TransactionEntity>)
+
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAll()
 }
 
 @Dao

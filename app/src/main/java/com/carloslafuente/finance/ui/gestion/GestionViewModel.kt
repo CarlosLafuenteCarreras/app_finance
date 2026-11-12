@@ -1,10 +1,14 @@
 package com.carloslafuente.finance.ui.gestion
 
+import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.carloslafuente.finance.R
+import com.carloslafuente.finance.data.backup.BackupRepository
 import com.carloslafuente.finance.data.local.AppDatabase
 import com.carloslafuente.finance.data.local.TransactionType
 import com.carloslafuente.finance.data.prices.PriceRepository
@@ -55,18 +59,25 @@ data class GestionUiState(
     val transactions: List<TransactionRow> = emptyList(),
     val hasOversold: Boolean = false,
     val refresh: RefreshState = RefreshState(),
+    /** Outcome of the last backup export or import. */
+    @StringRes val backupMessage: Int? = null,
 )
 
-class GestionViewModel(db: AppDatabase, private val priceRepository: PriceRepository) : ViewModel() {
+class GestionViewModel(
+    db: AppDatabase,
+    private val priceRepository: PriceRepository,
+    private val backupRepository: BackupRepository,
+) : ViewModel() {
     private val refresh = MutableStateFlow(RefreshState())
+    private val backupMessage = MutableStateFlow<Int?>(null)
 
     val uiState: StateFlow<GestionUiState> = combine(
         db.accountDao().observeAll(),
         db.assetDao().observeAll(),
         db.transactionDao().observeAll(),
         db.priceDao().observeLatest(),
-        refresh,
-    ) { accounts, assets, transactions, prices, refresh ->
+        combine(refresh, backupMessage, ::Pair),
+    ) { accounts, assets, transactions, prices, (refresh, backupMessage) ->
         val ledger = buildLedger(transactions)
         val accountNames = accounts.associate { it.id to it.name }
         val assetNames = assets.associate { it.id to it.name }
@@ -100,6 +111,7 @@ class GestionViewModel(db: AppDatabase, private val priceRepository: PriceReposi
             },
             hasOversold = ledger.oversold.isNotEmpty(),
             refresh = refresh,
+            backupMessage = backupMessage,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GestionUiState())
 
@@ -120,9 +132,22 @@ class GestionViewModel(db: AppDatabase, private val priceRepository: PriceReposi
         priceRepository.setManualPrice(assetId, price)
     }
 
+    fun exportBackup(uri: Uri) = viewModelScope.launch {
+        backupMessage.value = if (backupRepository.export(uri)) R.string.backup_exported else R.string.backup_export_failed
+    }
+
+    fun importBackup(uri: Uri) = viewModelScope.launch {
+        val imported = backupRepository.import(uri)
+        backupMessage.value = if (imported) R.string.backup_imported else R.string.backup_import_failed
+        if (imported) refreshPrices()
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
-            initializer { GestionViewModel(financeContainer().database, financeContainer().priceRepository) }
+            initializer {
+                val container = financeContainer()
+                GestionViewModel(container.database, container.priceRepository, container.backupRepository)
+            }
         }
     }
 }

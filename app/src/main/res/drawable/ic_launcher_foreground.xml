@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Three rising bars, ink colored, inside the adaptive icon safe zone. -->
+    <path
+        android:fillColor="#1F1C18"
+        android:pathData="M36,58 h9 v20 h-9 Z M49.5,46 h9 v32 h-9 Z M63,32 h9 v46 h-9 Z" />
+</vector>

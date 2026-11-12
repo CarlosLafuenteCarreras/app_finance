@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Finance</string>
+
+    <string name="tab_gestion">Gestión</string>
+    <string name="tab_magia">Magia</string>
+
+    <string name="gestion_empty_title">Tu cartera está vacía</string>
+    <string name="gestion_empty_message">Aquí verás tus cuentas, posiciones y rentabilidad cuando añadas tu primera operación.</string>
+
+    <string name="magia_empty_title">Aún no hay magia</string>
+    <string name="magia_empty_message">Los análisis con IA llegarán cuando la gestión de la cartera esté lista.</string>
+    <string name="magia_disclaimer">Nada de lo que aparece aquí es una recomendación de inversión.</string>
+</resources>

@@ -17,7 +17,13 @@
     <string name="gestion_empty_message">Pulsa + para añadir tu primera operación. Empieza por un depósito o una compra.</string>
     <string name="gestion_add_transaction">Añadir operación</string>
     <string name="gestion_section_accounts">CUENTAS · EFECTIVO</string>
-    <string name="gestion_section_positions">POSICIONES · COSTE</string>
+    <string name="gestion_section_positions">POSICIONES · VALOR</string>
+    <string name="gestion_total">Patrimonio total</string>
+    <string name="gestion_refresh_prices">Actualizar precios</string>
+    <string name="gestion_prices_failed">Sin precio nuevo para: %1$s. Toca la posición para ponerlo a mano.</string>
+    <string name="gestion_no_price">sin precio, a coste</string>
+    <string name="gestion_price_from">precio del %1$s</string>
+    <string name="gestion_manual_price">Precio actual por unidad (€)</string>
     <string name="gestion_section_transactions">OPERACIONES</string>
     <string name="gestion_position_quantity">%1$s participaciones</string>
     <string name="gestion_oversold_warning">Hay ventas que superan lo que tenía la cuenta en esa fecha. Revisa las operaciones.</string>

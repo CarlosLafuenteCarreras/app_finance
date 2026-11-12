@@ -1,6 +1,7 @@
 package com.carloslafuente.finance.data.local
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -25,8 +26,9 @@ class Converters {
 }
 
 @Database(
-    entities = [AccountEntity::class, AssetEntity::class, TransactionEntity::class],
-    version = 1,
+    entities = [AccountEntity::class, AssetEntity::class, TransactionEntity::class, PriceEntity::class],
+    version = 2,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -34,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun accountDao(): AccountDao
     abstract fun assetDao(): AssetDao
     abstract fun transactionDao(): TransactionDao
+    abstract fun priceDao(): PriceDao
 
     companion object {
         fun build(context: Context): AppDatabase =

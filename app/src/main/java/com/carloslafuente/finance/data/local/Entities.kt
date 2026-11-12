@@ -85,3 +85,22 @@ data class TransactionEntity(
     val tax: BigDecimal = BigDecimal.ZERO,
     val note: String = "",
 )
+
+/** Latest known price per asset and day, in EUR; fetched from the network or typed by hand. */
+@Entity(
+    tableName = "prices",
+    primaryKeys = ["assetId", "date"],
+    foreignKeys = [
+        ForeignKey(
+            entity = AssetEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["assetId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+)
+data class PriceEntity(
+    val assetId: Long,
+    val date: LocalDate,
+    val price: BigDecimal,
+)

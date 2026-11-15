@@ -35,6 +35,21 @@ class PriceParsersTest {
     }
 
     @Test
+    fun `LS Exchange history keeps one close per day, oldest first`() {
+        val json = """{"series":{"intraday":{"data":[[1794468720000,321.025]]},""" +
+            """"history":{"data":[[1794355200000,320.775],[1794441600000,321.025],[1794520687000,320.875]]}}}"""
+
+        assertEquals(
+            listOf(
+                Quote(LocalDate.parse("2026-11-11"), BigDecimal("320.775")),
+                Quote(LocalDate.parse("2026-11-12"), BigDecimal("320.875")),
+            ),
+            parseLsHistory(json),
+        )
+        assertEquals(emptyList<Quote>(), parseLsHistory("<html>blocked</html>"))
+    }
+
+    @Test
     fun `FT tearsheet price and date`() {
         val html = """<span class="mod-ui-data-list__label" title="...">Price (EUR)</span>""" +
             """<span class="mod-ui-data-list__value">1,065.27</span></li>""" +

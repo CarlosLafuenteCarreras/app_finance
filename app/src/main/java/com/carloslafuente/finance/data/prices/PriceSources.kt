@@ -47,6 +47,20 @@ fun parseLsChart(json: String): Quote? = runCatching {
     )
 }.getOrNull()
 
+/** Daily closes from the `series.history.data` points of the LS Exchange chart JSON, oldest first. */
+fun parseLsHistory(json: String): List<Quote> = runCatching {
+    val zone = ZoneId.of("Europe/Berlin")
+    Json.parseToJsonElement(json).jsonObject.getValue("series").jsonObject
+        .getValue("history").jsonObject.getValue("data").jsonArray
+        .map { point ->
+            Quote(
+                date = Instant.ofEpochMilli(point.jsonArray[0].jsonPrimitive.content.toLong()).atZone(zone).toLocalDate(),
+                price = BigDecimal(point.jsonArray[1].jsonPrimitive.content),
+            )
+        }
+        .associateBy { it.date }.values.sortedBy { it.date }
+}.getOrDefault(emptyList())
+
 private val ftPrice = Regex("""Price \(EUR\)</span><span class="mod-ui-data-list__value">([\d.,]+)<""")
 private val ftDate = Regex("""as of ([A-Z][a-z]{2} \d{1,2} \d{4})""")
 private val ftDateFormat = DateTimeFormatter.ofPattern("MMM d yyyy", Locale.ENGLISH)
@@ -67,6 +81,14 @@ class PriceSources(private val client: OkHttpClient) {
         AssetType.ETF -> justEtf(isin) ?: lsExchange(isin)
         AssetType.STOCK -> lsExchange(isin)
         AssetType.BOND -> null
+    }
+
+    /** Daily price history of an exchange-traded asset; empty when it cannot be fetched. */
+    fun history(isin: String): List<Quote> {
+        val id = get("https://www.ls-tc.de/_rpc/json/.lstc/instrument/search/main?q=$isin&localeId=2")
+            ?.let(::parseLsInstrumentId) ?: return emptyList()
+        return get("https://www.ls-tc.de/_rpc/json/instrument/chart/dataForInstrument?instrumentId=$id")
+            ?.let(::parseLsHistory).orEmpty()
     }
 
     private fun justEtf(isin: String): Quote? =

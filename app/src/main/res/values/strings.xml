@@ -11,6 +11,7 @@
     <string name="action_delete">Eliminar</string>
     <string name="action_accept">Aceptar</string>
     <string name="action_cancel">Cancelar</string>
+    <string name="action_close">Cerrar</string>
 
     <!-- Gestión -->
     <string name="gestion_empty_title">Tu cartera está vacía</string>
@@ -29,6 +30,25 @@
     <string name="gestion_oversold_warning">Hay ventas que superan lo que tenía la cuenta en esa fecha. Revisa las operaciones.</string>
 
     <string name="gestion_more_options">Más opciones</string>
+
+    <!-- Performance -->
+    <string name="performance_benchmark">Lo mismo invertido en el MSCI World valdría %1$s</string>
+    <string name="performance_ahead">Vas %1$s por delante del índice</string>
+    <string name="performance_behind">Vas %1$s por detrás del índice</string>
+    <string name="performance_annualized">Rentabilidad anualizada: %1$s</string>
+    <string name="performance_annualized_both">Rentabilidad anualizada: %1$s · índice: %2$s</string>
+
+    <!-- Sale simulator -->
+    <string name="sale_title">Simular venta de %1$s</string>
+    <string name="sale_invalid">Indica una cantidad que tengas y un precio.</string>
+    <string name="sale_proceeds">Importe de la venta</string>
+    <string name="sale_cost">Coste de compra (FIFO)</string>
+    <string name="sale_gain">Ganancia o pérdida</string>
+    <string name="sale_tax">Impuesto estimado</string>
+    <string name="sale_after_tax">Te queda tras impuestos</string>
+    <string name="sale_loss_deferred">Vendes con pérdida y te quedarían participaciones compradas en los últimos 2 meses: Hacienda no deja compensar esa pérdida todavía.</string>
+    <string name="sale_disclaimer">Estimación con los tramos del ahorro (19–30 %) sobre las ganancias de este año. No cuenta dividendos, intereses ni pérdidas de años anteriores. Un traspaso entre fondos no tributa.</string>
+    <string name="sale_set_price">Poner precio a mano</string>
 
     <string name="summary_copy">Copiar resumen para IA</string>
     <string name="summary_copy_without_amounts">Copiar resumen sin importes</string>

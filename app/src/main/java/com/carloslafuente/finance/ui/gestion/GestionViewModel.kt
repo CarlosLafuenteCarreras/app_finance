@@ -10,10 +10,14 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.carloslafuente.finance.R
 import com.carloslafuente.finance.data.backup.BackupRepository
 import com.carloslafuente.finance.data.local.AppDatabase
+import com.carloslafuente.finance.data.local.TransactionEntity
 import com.carloslafuente.finance.data.local.TransactionType
 import com.carloslafuente.finance.data.prices.PriceRepository
+import com.carloslafuente.finance.domain.annualizedReturn
+import com.carloslafuente.finance.domain.benchmarkValue
 import com.carloslafuente.finance.domain.buildLedger
 import com.carloslafuente.finance.domain.cashEffect
+import com.carloslafuente.finance.domain.investmentFlows
 import com.carloslafuente.finance.ui.financeContainer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +40,7 @@ data class PositionRow(
     /** Market value at the latest known price; null when the asset has no price yet. */
     val value: BigDecimal?,
     val priceDate: LocalDate?,
+    val price: BigDecimal? = null,
 ) {
     val gain: BigDecimal? get() = value?.minus(cost)
 }
@@ -49,6 +54,16 @@ data class TransactionRow(
     val cashEffect: BigDecimal,
 )
 
+/** How the invested money has done, next to the same money put into the benchmark on the same dates. */
+data class Performance(
+    val positionsValue: BigDecimal,
+    /** Null until the benchmark history is available. */
+    val benchmarkValue: BigDecimal?,
+    /** Annualized rates; null with less than a year of history, where annualizing misleads. */
+    val annualized: Double?,
+    val benchmarkAnnualized: Double?,
+)
+
 data class RefreshState(val running: Boolean = false, val failed: List<String> = emptyList())
 
 data class GestionUiState(
@@ -58,6 +73,9 @@ data class GestionUiState(
     val accounts: List<AccountRow> = emptyList(),
     val positions: List<PositionRow> = emptyList(),
     val transactions: List<TransactionRow> = emptyList(),
+    /** Raw ledger, for the sale simulator. */
+    val ledgerTransactions: List<TransactionEntity> = emptyList(),
+    val performance: Performance? = null,
     val hasOversold: Boolean = false,
     val refresh: RefreshState = RefreshState(),
     /** Outcome of the last backup export or import. */
@@ -77,8 +95,8 @@ class GestionViewModel(
         db.assetDao().observeAll(),
         db.transactionDao().observeAll(),
         db.priceDao().observeLatest(),
-        combine(refresh, backupMessage, ::Pair),
-    ) { accounts, assets, transactions, prices, (refresh, backupMessage) ->
+        combine(refresh, backupMessage, priceRepository.benchmark, ::Triple),
+    ) { accounts, assets, transactions, prices, (refresh, backupMessage, benchmark) ->
         val ledger = buildLedger(transactions)
         val accountNames = accounts.associate { it.id to it.name }
         val assetsById = assets.associateBy { it.id }
@@ -94,8 +112,14 @@ class GestionViewModel(
                 cost = lots.sumOf { it.cost },
                 value = price?.let { quantity * it.price },
                 priceDate = price?.date,
+                price = price?.price,
             )
         }.sortedByDescending { it.value ?: it.cost }
+        val today = LocalDate.now()
+        val flows = investmentFlows(transactions)
+        val positionsValue = positions.sumOf { it.value ?: it.cost }
+        val benchmarkNow = benchmarkValue(flows, benchmark)
+        val overAYear = flows.isNotEmpty() && flows.first().date <= today.minusYears(1)
         GestionUiState(
             loading = false,
             total = ledger.cash.values.sumOf { it } + positions.sumOf { it.value ?: it.cost },
@@ -111,6 +135,13 @@ class GestionViewModel(
                     cashEffect = it.cashEffect(),
                 )
             },
+            ledgerTransactions = transactions,
+            performance = if (flows.isEmpty()) null else Performance(
+                positionsValue = positionsValue,
+                benchmarkValue = benchmarkNow,
+                annualized = if (overAYear) annualizedReturn(flows, positionsValue, today) else null,
+                benchmarkAnnualized = if (overAYear && benchmarkNow != null) annualizedReturn(flows, benchmarkNow, today) else null,
+            ),
             hasOversold = ledger.oversold.isNotEmpty(),
             refresh = refresh,
             backupMessage = backupMessage,

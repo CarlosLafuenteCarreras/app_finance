@@ -26,6 +26,10 @@ fun formatMoney(value: BigDecimal): String =
 fun formatQuantity(value: BigDecimal): String =
     DecimalFormat("#,##0.######", DecimalFormatSymbols(spanish)).format(value)
 
+/** A rate such as 0.1234 as "+12,3 %". */
+fun formatPercent(rate: Double): String =
+    DecimalFormat("+0.0;-0.0", DecimalFormatSymbols(spanish)).format(rate * 100) + " %"
+
 fun formatDate(date: LocalDate): String = date.format(dateFormat)
 
 /** Accepts both "1234,56" and "1234.56"; with a comma present, dots are thousands separators. */

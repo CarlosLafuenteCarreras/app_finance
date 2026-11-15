@@ -46,12 +46,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.carloslafuente.finance.R
+import com.carloslafuente.finance.data.local.TransactionEntity
 import com.carloslafuente.finance.data.local.TransactionType
+import com.carloslafuente.finance.domain.simulateSale
 import com.carloslafuente.finance.ui.EmptyState
 import com.carloslafuente.finance.ui.formatDate
 import com.carloslafuente.finance.ui.formatMoney
+import com.carloslafuente.finance.ui.formatPercent
 import com.carloslafuente.finance.ui.formatQuantity
 import com.carloslafuente.finance.ui.parseDecimal
+import java.math.BigDecimal
 import java.time.LocalDate
 
 /** A price older than this is shown with its date so it is not mistaken for a current one. */
@@ -76,6 +80,7 @@ fun GestionScreen(
     viewModel: GestionViewModel = viewModel(factory = GestionViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var openPosition by remember { mutableStateOf<PositionRow?>(null) }
     var pricedPosition by remember { mutableStateOf<PositionRow?>(null) }
     var confirmImport by remember { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -109,6 +114,9 @@ fun GestionScreen(
                     message = stringResource(R.string.gestion_empty_message),
                 )
             } else LazyColumn(contentPadding = PaddingValues(bottom = 88.dp)) {
+                state.performance?.let { performance ->
+                    item { PerformanceSummary(performance) }
+                }
                 if (state.hasOversold) {
                     item { Warning(stringResource(R.string.gestion_oversold_warning)) }
                 }
@@ -127,7 +135,7 @@ fun GestionScreen(
                 if (state.positions.isNotEmpty()) {
                     item { SectionHeader(R.string.gestion_section_positions) }
                     items(state.positions, key = { "position-${it.assetId}" }) { position ->
-                        PositionItem(position, onClick = { pricedPosition = position })
+                        PositionItem(position, onClick = { openPosition = position })
                     }
                 }
                 item { SectionHeader(R.string.gestion_section_transactions) }
@@ -169,6 +177,18 @@ fun GestionScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmImport = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
+    openPosition?.let { position ->
+        SaleSimulatorDialog(
+            position = position,
+            transactions = state.ledgerTransactions,
+            onDismiss = { openPosition = null },
+            onSetPrice = {
+                openPosition = null
+                pricedPosition = position
             },
         )
     }
@@ -248,6 +268,109 @@ private fun TotalHeader(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PerformanceSummary(performance: Performance) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        val benchmark = performance.benchmarkValue
+        if (benchmark != null) {
+            val difference = performance.positionsValue - benchmark
+            Text(
+                stringResource(R.string.performance_benchmark, formatMoney(benchmark)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(
+                    if (difference.signum() >= 0) R.string.performance_ahead else R.string.performance_behind,
+                    formatMoney(difference.abs()),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (difference.signum() >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+            )
+        }
+        performance.annualized?.let { rate ->
+            val benchmarkRate = performance.benchmarkAnnualized
+            Text(
+                if (benchmarkRate != null) {
+                    stringResource(R.string.performance_annualized_both, formatPercent(rate), formatPercent(benchmarkRate))
+                } else {
+                    stringResource(R.string.performance_annualized, formatPercent(rate))
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SaleSimulatorDialog(
+    position: PositionRow,
+    transactions: List<TransactionEntity>,
+    onDismiss: () -> Unit,
+    onSetPrice: () -> Unit,
+) {
+    var quantityText by remember { mutableStateOf(position.quantity.stripTrailingZeros().toPlainString()) }
+    var priceText by remember { mutableStateOf(position.price?.toPlainString().orEmpty()) }
+    val quantity = parseDecimal(quantityText)
+    val price = parseDecimal(priceText)?.takeIf { it.signum() > 0 }
+    val simulation = if (quantity != null && price != null) {
+        simulateSale(transactions, position.assetId, quantity, price, BigDecimal.ZERO, LocalDate.now())
+    } else {
+        null
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sale_title, position.name)) },
+        text = {
+            Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = quantityText,
+                    onValueChange = { quantityText = it },
+                    label = { Text(stringResource(R.string.form_quantity)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it },
+                    label = { Text(stringResource(R.string.form_price)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                if (simulation == null) {
+                    Text(stringResource(R.string.sale_invalid), color = MaterialTheme.colorScheme.error)
+                } else {
+                    SaleLine(R.string.sale_proceeds, formatMoney(simulation.proceeds))
+                    SaleLine(R.string.sale_cost, formatMoney(simulation.cost))
+                    SaleLine(R.string.sale_gain, formatMoney(simulation.gain))
+                    SaleLine(R.string.sale_tax, formatMoney(simulation.tax))
+                    SaleLine(R.string.sale_after_tax, formatMoney(simulation.afterTax), emphasized = true)
+                    if (simulation.lossDeferred) {
+                        Text(stringResource(R.string.sale_loss_deferred), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                Text(
+                    stringResource(R.string.sale_disclaimer),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+        dismissButton = { TextButton(onClick = onSetPrice) { Text(stringResource(R.string.sale_set_price)) } },
+    )
+}
+
+@Composable
+private fun SaleLine(@StringRes label: Int, value: String, emphasized: Boolean = false) {
+    val style = if (emphasized) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium
+    Row(Modifier.fillMaxWidth()) {
+        Text(stringResource(label), style = style, modifier = Modifier.weight(1f))
+        Text(value, style = style)
     }
 }
 

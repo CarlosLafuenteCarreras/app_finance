@@ -119,6 +119,31 @@
     <string name="plan_target_label">Peso objetivo (%)</string>
     <string name="plan_ceiling_label">Techo sobre el total (%)</string>
 
+    <!-- Tax report -->
+    <string name="tax_title">Informe fiscal</string>
+    <string name="tax_section_summary">Resumen del año</string>
+    <string name="tax_proceeds">Valor de transmisión</string>
+    <string name="tax_cost">Valor de adquisición</string>
+    <string name="tax_gain">Ganancia o pérdida patrimonial</string>
+    <string name="tax_dividends">Dividendos (brutos)</string>
+    <string name="tax_interest">Intereses (brutos)</string>
+    <string name="tax_withheld">Retenciones ya practicadas</string>
+    <string name="tax_estimated">Impuesto estimado</string>
+    <string name="tax_to_pay">A pagar en la renta</string>
+    <string name="tax_disclaimer">Estimación con los tramos del ahorro. No compensa pérdidas de ventas con dividendos ni pérdidas de años anteriores, y no aplica la regla de los dos meses. Los traspasos entre fondos no tributan.</string>
+    <string name="tax_copy">Copiar informe</string>
+    <string name="tax_section_sales">Ventas, por lote de compra</string>
+    <string name="tax_no_sales">No hay ventas en este año.</string>
+    <string name="tax_sale_detail">%1$s uds. · compra %2$s · venta %3$s</string>
+
+    <!-- Projection -->
+    <string name="projection_title">Proyección</string>
+    <string name="projection_monthly">Aportación mensual (€)</string>
+    <string name="projection_rate">%1$d %% anual</string>
+    <string name="projection_detail">en %1$d años · aportado %2$s</string>
+    <string name="projection_years">En %1$d años</string>
+    <string name="projection_disclaimer">Cálculo con rentabilidad constante, sin inflación ni impuestos. La realidad tendrá años mucho mejores y mucho peores; sirve para ver el orden de magnitud. Arrastra sobre la gráfica para ver cada año.</string>
+
     <!-- Backup -->
     <string name="backup_export">Exportar copia de seguridad</string>
     <string name="backup_import">Importar copia de seguridad</string>

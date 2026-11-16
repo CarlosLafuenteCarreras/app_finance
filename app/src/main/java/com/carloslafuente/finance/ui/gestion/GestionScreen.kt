@@ -99,6 +99,8 @@ fun TransactionType.labelRes(): Int = when (this) {
 fun GestionScreen(
     onOpenTransaction: (Long) -> Unit,
     onOpenAsset: (Long) -> Unit,
+    onOpenTaxReport: () -> Unit,
+    onOpenProjection: (startValue: Double) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: GestionViewModel = viewModel(factory = GestionViewModel.Factory),
 ) {
@@ -132,6 +134,8 @@ fun GestionScreen(
                 onCopySummary = ::copySummary,
                 onExport = { exportLauncher.launch("finance-backup-" + LocalDate.now() + ".json") },
                 onImport = { confirmImport = true },
+                onOpenTaxReport = onOpenTaxReport,
+                onOpenProjection = { onOpenProjection(state.positionsValue.toDouble()) },
                 onImportPlan = { planLauncher.launch(arrayOf("text/*", "application/octet-stream")) },
             )
             state.planImport?.let { PlanImportMessage(it) }
@@ -258,6 +262,8 @@ private fun TotalHeader(
     onExport: () -> Unit,
     onImport: () -> Unit,
     onImportPlan: () -> Unit,
+    onOpenTaxReport: () -> Unit,
+    onOpenProjection: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
@@ -288,6 +294,20 @@ private fun TotalHeader(
                     onClick = {
                         menuOpen = false
                         onRefresh()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.tax_title)) },
+                    onClick = {
+                        menuOpen = false
+                        onOpenTaxReport()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.projection_title)) },
+                    onClick = {
+                        menuOpen = false
+                        onOpenProjection()
                     },
                 )
                 DropdownMenuItem(

@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.carloslafuente.finance.R
 import com.carloslafuente.finance.data.local.AssetType
+import com.carloslafuente.finance.data.local.PlanRole
 import com.carloslafuente.finance.data.local.TransactionEntity
 import com.carloslafuente.finance.data.prices.Quote
 import com.carloslafuente.finance.domain.simulateSale
@@ -84,6 +85,7 @@ fun AssetScreen(
     var range by rememberSaveable { mutableStateOf(ChartRange.ONE_YEAR) }
     var simulating by remember { mutableStateOf(false) }
     var pricing by remember { mutableStateOf(false) }
+    var planning by remember { mutableStateOf(false) }
     val points = remember(state.quotes, range) { pricePoints(state.quotes, range) }
     val position = state.position
 
@@ -159,6 +161,19 @@ fun AssetScreen(
                     }
                 }
             }
+            item {
+                SectionHeader(R.string.plan_section)
+                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DetailLine(R.string.plan_role, stringResource(state.planRole.labelRes()))
+                    state.planWeight?.let {
+                        DetailLine(
+                            if (state.planRole == PlanRole.OUTSIDE) R.string.plan_ceiling_label else R.string.plan_target_label,
+                            formatWeight(it),
+                        )
+                    }
+                    OutlinedButton(onClick = { planning = true }) { Text(stringResource(R.string.plan_edit)) }
+                }
+            }
             item { SectionHeader(R.string.gestion_section_transactions) }
             items(state.transactions, key = { it.id }) { tx ->
                 TransactionItem(tx, showAsset = false, onClick = { onOpenTransaction(tx.id) })
@@ -168,6 +183,18 @@ fun AssetScreen(
 
     if (simulating && position != null) {
         SaleSimulatorDialog(position, state.ledgerTransactions, onDismiss = { simulating = false })
+    }
+    if (planning) {
+        PlanDialog(
+            assetName = state.name,
+            role = state.planRole,
+            weight = state.planWeight,
+            onDismiss = { planning = false },
+            onConfirm = { role, weight ->
+                viewModel.setPlan(role, weight)
+                planning = false
+            },
+        )
     }
     if (pricing) {
         ManualPriceDialog(

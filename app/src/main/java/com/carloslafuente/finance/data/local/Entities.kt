@@ -18,12 +18,18 @@ data class AccountEntity(
 
 enum class AssetType { STOCK, ETF, FUND, BOND }
 
+/** The asset's place in the investment plan. Outside-plan assets are personal bets that do not count for its weights. */
+enum class PlanRole { CORE, SATELLITE, OUTSIDE }
+
 @Entity(tableName = "assets")
 data class AssetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val type: AssetType,
     val isin: String? = null,
+    val planRole: PlanRole? = null,
+    /** Target weight in percent; for an asset outside the plan, the most it may weigh. */
+    val planWeight: BigDecimal? = null,
 )
 
 /** Which form fields each kind of transaction uses; all money is in EUR, as charged by the broker. */

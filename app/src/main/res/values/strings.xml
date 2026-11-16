@@ -80,6 +80,29 @@
     <string name="summary_copy">Copiar resumen para IA</string>
     <string name="summary_copy_without_amounts">Copiar resumen sin importes</string>
 
+    <!-- Plan -->
+    <string name="plan_section">Plan</string>
+    <string name="plan_core">Núcleo</string>
+    <string name="plan_satellite">Satélites</string>
+    <string name="plan_outside">Fuera del plan</string>
+    <string name="plan_none">Sin plan</string>
+    <string name="plan_weight_target">%1$s · objetivo %2$s</string>
+    <string name="plan_weight_ceiling">%1$s del total · techo %2$s</string>
+    <string name="plan_weight_only">%1$s</string>
+    <string name="plan_gap_missing">faltan %1$s</string>
+    <string name="plan_gap_over">sobran %1$s</string>
+    <string name="plan_gap_room">margen %1$s</string>
+    <string name="plan_gap_exceeded">%1$s por encima</string>
+    <string name="plan_note">Los pesos del núcleo y los satélites se miden sobre la cartera del plan; lo de fuera del plan, sobre el total.</string>
+    <string name="plan_import">Importar plan (Markdown)</string>
+    <string name="plan_import_done">Plan importado: %1$d productos.</string>
+    <string name="plan_import_unmatched">Sin ISIN en el documento: %1$s. Abre ese activo (o créalo) y ponle el objetivo en «Editar plan».</string>
+    <string name="plan_import_failed">No se encontró la tabla de productos (columnas ISIN, Tipo y Estado) en ese archivo.</string>
+    <string name="plan_edit">Editar plan</string>
+    <string name="plan_role">Papel en el plan</string>
+    <string name="plan_target_label">Peso objetivo (%)</string>
+    <string name="plan_ceiling_label">Techo sobre el total (%)</string>
+
     <!-- Backup -->
     <string name="backup_export">Exportar copia de seguridad</string>
     <string name="backup_import">Importar copia de seguridad</string>

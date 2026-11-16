@@ -12,14 +12,18 @@ import com.carloslafuente.finance.data.backup.BackupRepository
 import com.carloslafuente.finance.data.local.AppDatabase
 import com.carloslafuente.finance.data.local.TransactionEntity
 import com.carloslafuente.finance.data.local.TransactionType
+import com.carloslafuente.finance.data.plan.PlanImportResult
+import com.carloslafuente.finance.data.plan.PlanImporter
 import com.carloslafuente.finance.data.prices.PriceRepository
 import com.carloslafuente.finance.data.prices.Quote
+import com.carloslafuente.finance.domain.PlanLine
 import com.carloslafuente.finance.domain.ValuePoint
 import com.carloslafuente.finance.domain.annualizedReturn
 import com.carloslafuente.finance.domain.benchmarkValue
 import com.carloslafuente.finance.domain.buildLedger
 import com.carloslafuente.finance.domain.cashEffect
 import com.carloslafuente.finance.domain.investmentFlows
+import com.carloslafuente.finance.domain.planLines
 import com.carloslafuente.finance.domain.portfolioHistory
 import com.carloslafuente.finance.ui.financeContainer
 import kotlinx.coroutines.Dispatchers
@@ -99,13 +103,19 @@ data class GestionUiState(
     val refresh: RefreshState = RefreshState(),
     /** Outcome of the last backup export or import. */
     @StringRes val backupMessage: Int? = null,
+    /** Assets with a role in the plan, against their targets. */
+    val plan: List<PlanLine> = emptyList(),
+    /** Outcome of the last plan import. */
+    val planImport: PlanImportResult? = null,
 )
 
 class GestionViewModel(
     db: AppDatabase,
     private val priceRepository: PriceRepository,
     private val backupRepository: BackupRepository,
+    private val planImporter: PlanImporter,
 ) : ViewModel() {
+    private val planImport = MutableStateFlow<PlanImportResult?>(null)
     private val refresh = MutableStateFlow(RefreshState())
     private val backupMessage = MutableStateFlow<Int?>(null)
 
@@ -114,8 +124,8 @@ class GestionViewModel(
         db.assetDao().observeAll(),
         db.transactionDao().observeAll(),
         db.priceDao().observeAll(),
-        combine(refresh, backupMessage, priceRepository.benchmark, ::Triple),
-    ) { accounts, assets, transactions, prices, (refresh, backupMessage, benchmark) ->
+        combine(refresh, backupMessage, priceRepository.benchmark, planImport, ::Extras),
+    ) { accounts, assets, transactions, prices, (refresh, backupMessage, benchmark, planImport) ->
         val ledger = buildLedger(transactions)
         val accountNames = accounts.associate { it.id to it.name }
         val assetsById = assets.associateBy { it.id }
@@ -174,6 +184,8 @@ class GestionViewModel(
             hasOversold = ledger.oversold.isNotEmpty(),
             refresh = refresh,
             backupMessage = backupMessage,
+            plan = planLines(assets, positions.associate { it.assetId to (it.value ?: it.cost) }),
+            planImport = planImport,
         )
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GestionUiState())
 
@@ -200,11 +212,23 @@ class GestionViewModel(
         if (imported) refreshPrices()
     }
 
+    fun importPlan(uri: Uri) = viewModelScope.launch {
+        planImport.value = planImporter.import(uri)
+        refreshPrices()
+    }
+
+    private data class Extras(
+        val refresh: RefreshState,
+        val backupMessage: Int?,
+        val benchmark: List<Quote>,
+        val planImport: PlanImportResult?,
+    )
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = financeContainer()
-                GestionViewModel(container.database, container.priceRepository, container.backupRepository)
+                GestionViewModel(container.database, container.priceRepository, container.backupRepository, container.planImporter)
             }
         }
     }

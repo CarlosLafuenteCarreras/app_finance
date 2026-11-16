@@ -37,6 +37,9 @@ interface AssetDao {
     @Insert
     suspend fun insert(asset: AssetEntity): Long
 
+    @Update
+    suspend fun update(asset: AssetEntity)
+
     @Insert
     suspend fun insertAll(assets: List<AssetEntity>)
 

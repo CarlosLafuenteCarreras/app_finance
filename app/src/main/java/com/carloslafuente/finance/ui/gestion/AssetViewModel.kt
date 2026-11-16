@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.carloslafuente.finance.data.local.AppDatabase
 import com.carloslafuente.finance.data.local.AssetType
+import com.carloslafuente.finance.data.local.PlanRole
 import com.carloslafuente.finance.data.local.TransactionEntity
 import com.carloslafuente.finance.data.local.TransactionType
 import com.carloslafuente.finance.data.prices.PriceRepository
@@ -30,6 +31,8 @@ data class AssetUiState(
     val name: String = "",
     val type: AssetType? = null,
     val isin: String? = null,
+    val planRole: PlanRole? = null,
+    val planWeight: BigDecimal? = null,
     /** Price history, oldest first. */
     val quotes: List<Quote> = emptyList(),
     /** Null when nothing of this asset is held. */
@@ -41,7 +44,7 @@ data class AssetUiState(
 )
 
 class AssetViewModel(
-    db: AppDatabase,
+    private val db: AppDatabase,
     private val priceRepository: PriceRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -63,6 +66,8 @@ class AssetViewModel(
             name = asset.name,
             type = asset.type,
             isin = asset.isin,
+            planRole = asset.planRole,
+            planWeight = asset.planWeight,
             quotes = prices.map { Quote(it.date, it.price) },
             position = lots?.let {
                 val quantity = it.sumOf { lot -> lot.quantity }
@@ -87,6 +92,12 @@ class AssetViewModel(
 
     fun setManualPrice(price: BigDecimal) = viewModelScope.launch {
         priceRepository.setManualPrice(assetId, price)
+    }
+
+    /** A null [role] takes the asset out of the plan. */
+    fun setPlan(role: PlanRole?, weight: BigDecimal?) = viewModelScope.launch {
+        val asset = db.assetDao().getAll().first { it.id == assetId }
+        db.assetDao().update(asset.copy(planRole = role, planWeight = weight.takeIf { role != null }))
     }
 
     companion object {

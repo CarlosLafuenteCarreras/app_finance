@@ -8,6 +8,7 @@ import com.carloslafuente.finance.data.local.AccountKind
 import com.carloslafuente.finance.data.local.AppDatabase
 import com.carloslafuente.finance.data.local.AssetEntity
 import com.carloslafuente.finance.data.local.AssetType
+import com.carloslafuente.finance.data.local.PlanRole
 import com.carloslafuente.finance.data.local.TransactionEntity
 import com.carloslafuente.finance.data.local.TransactionType
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,8 @@ fun Backup.toJson(): String = prettyJson.encodeToString(
                     put("name", it.name)
                     put("type", it.type.name)
                     put("isin", it.isin)
+                    put("planRole", it.planRole?.name)
+                    put("planWeight", it.planWeight?.toPlainString())
                 })
             }
         })
@@ -97,6 +100,9 @@ fun parseBackup(json: String): Backup {
                 name = it.text("name"),
                 type = AssetType.valueOf(it.text("type")),
                 isin = it.textOrNull("isin"),
+                // Absent in backups written before the plan existed.
+                planRole = it["planRole"]?.jsonPrimitive?.contentOrNull?.let(PlanRole::valueOf),
+                planWeight = it["planWeight"]?.jsonPrimitive?.contentOrNull?.let(::BigDecimal),
             )
         },
         transactions = rows("transactions").map {

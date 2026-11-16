@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.carloslafuente.finance.R
 import com.carloslafuente.finance.data.local.TransactionType
+import com.carloslafuente.finance.data.plan.PlanImportResult
 import com.carloslafuente.finance.domain.ValuePoint
 import com.carloslafuente.finance.ui.ChartPoint
 import com.carloslafuente.finance.ui.ChartRange
@@ -118,6 +119,10 @@ fun GestionScreen(
         uri?.let(viewModel::importBackup)
     }
 
+    val planLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importPlan)
+    }
+
     val context = LocalContext.current
     fun copySummary(withAmounts: Boolean) {
         val summary = buildSummary(state, LocalDate.now(), withAmounts)
@@ -132,7 +137,9 @@ fun GestionScreen(
                 onCopySummary = ::copySummary,
                 onExport = { exportLauncher.launch("finance-backup-" + LocalDate.now() + ".json") },
                 onImport = { confirmImport = true },
+                onImportPlan = { planLauncher.launch(arrayOf("text/*", "application/octet-stream")) },
             )
+            state.planImport?.let { PlanImportMessage(it) }
             state.backupMessage?.let {
                 Text(stringResource(it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
@@ -168,6 +175,9 @@ fun GestionScreen(
                 }
                 state.gains?.let { gains ->
                     item { GainsCard(gains, state.performance) }
+                }
+                if (state.plan.isNotEmpty()) {
+                    item { PlanSection(state.plan, onOpenAsset) }
                 }
                 if (state.positions.isNotEmpty()) {
                     item { SectionHeader(R.string.gestion_section_positions) }
@@ -221,6 +231,7 @@ private fun TotalHeader(
     onCopySummary: (withAmounts: Boolean) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    onImportPlan: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
@@ -260,6 +271,13 @@ private fun TotalHeader(
                     },
                 )
                 DropdownMenuItem(
+                    text = { Text(stringResource(R.string.plan_import)) },
+                    onClick = {
+                        menuOpen = false
+                        onImportPlan()
+                    },
+                )
+                DropdownMenuItem(
                     text = { Text(stringResource(R.string.backup_export)) },
                     onClick = {
                         menuOpen = false
@@ -273,6 +291,20 @@ private fun TotalHeader(
                         onImport()
                     },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanImportMessage(result: PlanImportResult) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        if (result.applied == 0 && result.unmatched.isEmpty()) {
+            Text(stringResource(R.string.plan_import_failed), color = MaterialTheme.colorScheme.error)
+        } else {
+            Text(stringResource(R.string.plan_import_done, result.applied))
+            if (result.unmatched.isNotEmpty()) {
+                Text(stringResource(R.string.plan_import_unmatched, result.unmatched.joinToString()))
             }
         }
     }

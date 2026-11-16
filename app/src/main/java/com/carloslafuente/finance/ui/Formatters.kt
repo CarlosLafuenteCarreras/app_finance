@@ -1,5 +1,8 @@
 package com.carloslafuente.finance.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.carloslafuente.finance.AppContainer
@@ -23,8 +26,17 @@ private val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 fun formatMoney(value: BigDecimal): String =
     NumberFormat.getCurrencyInstance(spanish).apply { currency = Currency.getInstance("EUR") }.format(value)
 
+/** Privacy mode: while true the screens show no amounts, only percentages. Not persisted. */
+var hideAmounts by mutableStateOf(false)
+
+private const val HIDDEN_AMOUNT = "••••• €"
+
+/** [formatMoney] for the screens: masked in privacy mode. */
+fun displayMoney(value: BigDecimal): String = if (hideAmounts) HIDDEN_AMOUNT else formatMoney(value)
+
 /** Money with an explicit sign, for gains and losses. */
-fun formatSignedMoney(value: BigDecimal): String = (if (value.signum() >= 0) "+" else "") + formatMoney(value)
+fun formatSignedMoney(value: BigDecimal): String =
+    if (hideAmounts) HIDDEN_AMOUNT else (if (value.signum() >= 0) "+" else "") + formatMoney(value)
 
 fun formatQuantity(value: BigDecimal): String =
     DecimalFormat("#,##0.######", DecimalFormatSymbols(spanish)).format(value)

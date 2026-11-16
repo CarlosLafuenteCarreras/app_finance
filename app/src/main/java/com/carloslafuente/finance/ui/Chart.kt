@@ -35,11 +35,14 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.carloslafuente.finance.R
+import com.carloslafuente.finance.domain.ValuePoint
 import java.math.BigDecimal
 import java.time.LocalDate
 import kotlin.math.abs
@@ -189,8 +192,43 @@ fun gainColor(signum: Int): Color =
     if (signum >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
 
 /** "+12,30 € (+1,2 %)"; the sign is always written, so the color is never the only cue. */
-fun formatGain(gain: BigDecimal, rate: Double?): String =
-    formatSignedMoney(gain) + (rate?.let { " (${formatPercent(it)})" } ?: "")
+fun formatGain(gain: BigDecimal, rate: Double?): String = when {
+    rate == null -> formatSignedMoney(gain)
+    hideAmounts -> formatPercent(rate)
+    else -> formatSignedMoney(gain) + " (" + formatPercent(rate) + ")"
+}
+
+/** Value-over-time points of [range]; gain and rate are measured from the first visible day. */
+fun valuePoints(history: List<ValuePoint>, range: ChartRange): List<ChartPoint> {
+    val start = range.start(LocalDate.now())
+    val visible = if (start == null) history else history.filter { it.date >= start }
+    val first = visible.firstOrNull() ?: return emptyList()
+    return visible.map {
+        val added = it.invested - first.invested
+        val gain = (it.value - first.value) - added
+        // Measured against what was at work: the starting value plus the money added since.
+        val base = first.value + added.max(BigDecimal.ZERO)
+        ChartPoint(it.date, it.value, gain, if (base.signum() > 0) gain.toDouble() / base.toDouble() else null, it.invested)
+    }
+}
+
+/** Tiny axis-less line for list rows: the shape of the last weeks, nothing to read off it. */
+@Composable
+fun Sparkline(values: List<Float>, modifier: Modifier = Modifier) {
+    if (values.size < 2) return
+    val color = gainColor(values.last().compareTo(values.first()))
+    Canvas(modifier) {
+        val low = values.min()
+        val span = (values.max() - low).takeIf { it > 0f } ?: 1f
+        val path = Path()
+        values.forEachIndexed { i, v ->
+            val x = size.width * i / (values.size - 1)
+            val y = size.height * (1 - (v - low) / span)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path, color, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
 
 /**
  * Headline value, gain over the selected range, chart and range selector. Dragging over the
@@ -207,11 +245,12 @@ fun ChartSection(
     markers: List<LocalDate> = emptyList(),
 ) {
     var scrub by remember(points.size, range) { mutableStateOf<Int?>(null) }
+    val haptics = LocalHapticFeedback.current
     val shown = scrub?.let(points::getOrNull) ?: points.lastOrNull()
     Column(modifier) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             Text(
-                (shown?.value ?: fallbackValue)?.let(::formatMoney) ?: "—",
+                (shown?.value ?: fallbackValue)?.let(::displayMoney) ?: "—",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -242,7 +281,10 @@ fun ChartSection(
                 values = points.map { it.value.toFloat() },
                 lineColor = gainColor(points.last().gain.signum()),
                 scrub = scrub,
-                onScrub = { scrub = it },
+                onScrub = {
+                    if (it != null && it != scrub) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    scrub = it
+                },
                 modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 12.dp),
                 reference = points.map { it.reference?.toFloat() }.takeIf { null !in it }?.filterNotNull(),
                 baseline = points.first().value.toFloat().takeIf { showBaseline },

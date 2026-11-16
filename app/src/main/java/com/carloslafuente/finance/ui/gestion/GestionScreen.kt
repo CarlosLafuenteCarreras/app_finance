@@ -23,11 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,29 +53,34 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.carloslafuente.finance.R
 import com.carloslafuente.finance.data.local.TransactionType
 import com.carloslafuente.finance.data.plan.PlanImportResult
-import com.carloslafuente.finance.domain.ValuePoint
-import com.carloslafuente.finance.ui.ChartPoint
 import com.carloslafuente.finance.ui.ChartRange
 import com.carloslafuente.finance.ui.ChartSection
 import com.carloslafuente.finance.ui.EmptyState
+import com.carloslafuente.finance.ui.Sparkline
 import com.carloslafuente.finance.ui.formatDate
 import com.carloslafuente.finance.ui.formatGain
-import com.carloslafuente.finance.ui.formatMoney
+import com.carloslafuente.finance.ui.displayMoney
 import com.carloslafuente.finance.ui.formatPercent
 import com.carloslafuente.finance.ui.formatQuantity
 import com.carloslafuente.finance.ui.formatSignedMoney
 import com.carloslafuente.finance.ui.gainColor
+import com.carloslafuente.finance.ui.hideAmounts
+import com.carloslafuente.finance.ui.valuePoints
 import java.math.BigDecimal
 import java.time.LocalDate
 
 /** A price older than this is shown with its date so it is not mistaken for a current one. */
 private const val STALE_AFTER_DAYS = 4L
+
+/** Transactions listed before "show all". */
+private const val RECENT_TRANSACTIONS = 5
 
 @StringRes
 fun TransactionType.labelRes(): Int = when (this) {
@@ -87,20 +94,7 @@ fun TransactionType.labelRes(): Int = when (this) {
     TransactionType.SPLIT -> R.string.type_split
 }
 
-/** Portfolio points of [range]; gain and rate are measured from the first visible day. */
-private fun portfolioPoints(history: List<ValuePoint>, range: ChartRange): List<ChartPoint> {
-    val start = range.start(LocalDate.now())
-    val visible = if (start == null) history else history.filter { it.date >= start }
-    val first = visible.firstOrNull() ?: return emptyList()
-    return visible.map {
-        val added = it.invested - first.invested
-        val gain = (it.value - first.value) - added
-        // Measured against what was at work: the starting value plus the money added since.
-        val base = first.value + added.max(BigDecimal.ZERO)
-        ChartPoint(it.date, it.value, gain, if (base.signum() > 0) gain.toDouble() / base.toDouble() else null, it.invested)
-    }
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GestionScreen(
     onOpenTransaction: (Long) -> Unit,
@@ -111,7 +105,8 @@ fun GestionScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var range by rememberSaveable { mutableStateOf(ChartRange.MAX) }
     var confirmImport by remember { mutableStateOf(false) }
-    val points = remember(state.history, range) { portfolioPoints(state.history, range) }
+    var allTransactions by rememberSaveable { mutableStateOf(false) }
+    val points = remember(state.history, range) { valuePoints(state.history, range) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let(viewModel::exportBackup)
     }
@@ -148,7 +143,8 @@ fun GestionScreen(
                     title = stringResource(R.string.gestion_empty_title),
                     message = stringResource(R.string.gestion_empty_message),
                 )
-            } else LazyColumn(contentPadding = PaddingValues(bottom = 88.dp)) {
+            } else PullToRefreshBox(isRefreshing = state.refresh.running, onRefresh = viewModel::refreshPrices) {
+                LazyColumn(contentPadding = PaddingValues(bottom = 88.dp)) {
                 if (state.positions.isNotEmpty()) {
                     item {
                         ChartSection(
@@ -161,8 +157,20 @@ fun GestionScreen(
                     }
                 }
                 item {
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        DetailLine(R.string.gestion_total, formatMoney(state.total))
+                    Row(
+                        Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        val dayChange = state.dayChange
+                        if (dayChange != null) {
+                            StatTile(
+                                R.string.gestion_last_day,
+                                formatGain(dayChange, state.dayRate),
+                                Modifier.weight(1f),
+                                color = gainColor(dayChange.signum()),
+                            )
+                        }
+                        StatTile(R.string.gestion_total_short, displayMoney(state.total), Modifier.weight(1f))
                     }
                 }
                 if (state.hasOversold) {
@@ -189,12 +197,30 @@ fun GestionScreen(
                 items(state.accounts, key = { "account-" + it.id }) { account ->
                     ListItem(
                         headlineContent = { Text(account.name) },
-                        trailingContent = { Text(formatMoney(account.cash), style = MaterialTheme.typography.bodyLarge) },
+                        trailingContent = { Text(displayMoney(account.cash), style = MaterialTheme.typography.bodyLarge) },
                     )
                 }
                 item { SectionHeader(R.string.gestion_section_transactions) }
-                items(state.transactions, key = { "transaction-" + it.id }) { tx ->
+                val shown = if (allTransactions) state.transactions else state.transactions.take(RECENT_TRANSACTIONS)
+                items(shown, key = { "transaction-" + it.id }) { tx ->
                     TransactionItem(tx, showAsset = true, onClick = { onOpenTransaction(tx.id) })
+                }
+                if (state.transactions.size > RECENT_TRANSACTIONS) {
+                    item {
+                        TextButton(
+                            onClick = { allTransactions = !allTransactions },
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                        ) {
+                            Text(
+                                if (allTransactions) {
+                                    stringResource(R.string.gestion_show_fewer_transactions)
+                                } else {
+                                    stringResource(R.string.gestion_show_all_transactions, state.transactions.size)
+                                },
+                            )
+                        }
+                    }
+                }
                 }
             }
         }
@@ -244,18 +270,26 @@ private fun TotalHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        if (state.refresh.running) {
-            CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), strokeWidth = 2.dp)
-        } else {
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.gestion_refresh_prices))
-            }
+        IconButton(onClick = { hideAmounts = !hideAmounts }) {
+            Icon(
+                if (hideAmounts) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                contentDescription = stringResource(
+                    if (hideAmounts) R.string.gestion_show_amounts else R.string.gestion_hide_amounts,
+                ),
+            )
         }
         Box {
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.gestion_more_options))
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.gestion_refresh_prices)) },
+                    onClick = {
+                        menuOpen = false
+                        onRefresh()
+                    },
+                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.summary_copy)) },
                     onClick = {
@@ -310,9 +344,26 @@ private fun PlanImportMessage(result: PlanImportResult) {
     }
 }
 
-/** Names the two lines of the portfolio chart; the dashed one is the money put in. */
 @Composable
-private fun ChartLegend() {
+private fun StatTile(@StringRes label: Int, value: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            stringResource(label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(value, style = MaterialTheme.typography.titleMedium, color = color, maxLines = 1)
+    }
+}
+
+/** Names the two lines of a value chart; the dashed one is the money put in. */
+@Composable
+internal fun ChartLegend() {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val ink = MaterialTheme.colorScheme.onSurface
     Row(
@@ -371,14 +422,14 @@ private fun PerformanceSummary(performance: Performance) {
         if (benchmark != null) {
             val difference = performance.positionsValue - benchmark
             Text(
-                stringResource(R.string.performance_benchmark, formatMoney(benchmark)),
+                stringResource(R.string.performance_benchmark, displayMoney(benchmark)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 stringResource(
                     if (difference.signum() >= 0) R.string.performance_ahead else R.string.performance_behind,
-                    formatMoney(difference.abs()),
+                    displayMoney(difference.abs()),
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = gainColor(difference.signum()),
@@ -399,36 +450,48 @@ private fun PerformanceSummary(performance: Performance) {
     }
 }
 
+/** Name and weight on the left, the last weeks' shape in the middle, value and total gain on the right. */
 @Composable
 private fun PositionItem(position: PositionRow, onClick: () -> Unit) {
     val gain = position.gain
-    ListItem(
-        headlineContent = { Text(position.name) },
-        supportingContent = {
-            val quantity = stringResource(R.string.gestion_position_quantity, formatQuantity(position.quantity))
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(position.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val detail = stringResource(
+                R.string.gestion_position_detail,
+                formatQuantity(position.quantity),
+                formatWeight(BigDecimal(position.weight * 100)),
+            )
             val priceDate = position.priceDate
             Text(
                 when {
-                    priceDate == null -> quantity + " · " + stringResource(R.string.gestion_no_price)
+                    priceDate == null -> detail + " · " + stringResource(R.string.gestion_no_price)
                     priceDate < LocalDate.now().minusDays(STALE_AFTER_DAYS) ->
-                        quantity + " · " + stringResource(R.string.gestion_price_from, formatDate(priceDate))
-                    else -> quantity
+                        detail + " · " + stringResource(R.string.gestion_price_from, formatDate(priceDate))
+                    else -> detail
                 },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-        },
-        trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(formatMoney(position.value ?: position.cost), style = MaterialTheme.typography.bodyLarge)
-                if (gain != null) {
-                    Text(
-                        formatGain(gain, gain.toDouble() / position.cost.toDouble()),
-                        color = gainColor(gain.signum()),
-                    )
-                }
+        }
+        Sparkline(position.spark, Modifier.size(width = 56.dp, height = 28.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(displayMoney(position.value ?: position.cost), style = MaterialTheme.typography.bodyLarge)
+            if (gain != null) {
+                Text(
+                    formatGain(gain, gain.toDouble() / position.cost.toDouble()),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = gainColor(gain.signum()),
+                )
             }
-        },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
+        }
+    }
 }
 
 @Composable
@@ -441,7 +504,7 @@ internal fun TransactionItem(tx: TransactionRow, showAsset: Boolean, onClick: ()
         supportingContent = { Text(formatDate(tx.date) + " · " + tx.accountName) },
         trailingContent = {
             if (tx.type != TransactionType.SPLIT) {
-                Text(formatMoney(tx.cashEffect), style = MaterialTheme.typography.bodyLarge)
+                Text(displayMoney(tx.cashEffect), style = MaterialTheme.typography.bodyLarge)
             }
         },
         modifier = Modifier.clickable(onClick = onClick),

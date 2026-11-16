@@ -38,6 +38,8 @@ import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.LocalDate
 
+private const val SPARK_DAYS = 30
+
 data class AccountRow(val id: Long, val name: String, val cash: BigDecimal)
 
 data class PositionRow(
@@ -50,6 +52,12 @@ data class PositionRow(
     val value: BigDecimal?,
     val priceDate: LocalDate?,
     val price: BigDecimal? = null,
+    /** Share of the positions' total value, 0..1. */
+    val weight: Double = 0.0,
+    /** Change in value over the last priced day; null without two quotes. */
+    val dayChange: BigDecimal? = null,
+    /** Recent prices, oldest first, for the row's sparkline. */
+    val spark: List<Float> = emptyList(),
 ) {
     val gain: BigDecimal? get() = value?.minus(cost)
 }
@@ -96,6 +104,9 @@ data class GestionUiState(
     val ledgerTransactions: List<TransactionEntity> = emptyList(),
     val performance: Performance? = null,
     val positionsValue: BigDecimal = BigDecimal.ZERO,
+    /** Change over the last priced day, in euros and as a rate; null until there are two days of prices. */
+    val dayChange: BigDecimal? = null,
+    val dayRate: Double? = null,
     val gains: Gains? = null,
     /** Daily value of the positions since the first trade. */
     val history: List<ValuePoint> = emptyList(),
@@ -144,7 +155,19 @@ class GestionViewModel(
                 priceDate = price?.date,
                 price = price?.price,
             )
-        }.sortedByDescending { it.value ?: it.cost }
+        }.sortedByDescending { it.value ?: it.cost }.let { rows ->
+            val whole = rows.sumOf { it.value ?: it.cost }
+            rows.map { row ->
+                val history = quotes[row.assetId].orEmpty()
+                row.copy(
+                    weight = if (whole.signum() > 0) (row.value ?: row.cost).toDouble() / whole.toDouble() else 0.0,
+                    dayChange = history.takeIf { it.size >= 2 }
+                        ?.let { row.quantity * (it.last().price - it[it.size - 2].price) },
+                    spark = history.takeLast(SPARK_DAYS).map { it.price.toFloat() },
+                )
+            }
+        }
+        val dayChange = positions.mapNotNull { it.dayChange }.takeIf { it.isNotEmpty() }?.sumOf { it }
         val today = LocalDate.now()
         val flows = investmentFlows(transactions)
         val positionsValue = positions.sumOf { it.value ?: it.cost }
@@ -167,6 +190,10 @@ class GestionViewModel(
             },
             ledgerTransactions = transactions,
             positionsValue = positionsValue,
+            dayChange = dayChange,
+            dayRate = dayChange?.let { change ->
+                (positionsValue - change).takeIf { it.signum() > 0 }?.let { change.toDouble() / it.toDouble() }
+            },
             gains = if (flows.isEmpty()) null else Gains(
                 unrealized = positions.sumOf { it.gain ?: BigDecimal.ZERO },
                 realized = ledger.realized.sumOf { it.gain },

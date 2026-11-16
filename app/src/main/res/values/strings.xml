@@ -29,6 +29,14 @@
     <string name="gains_income">Dividendos e intereses</string>
     <string name="gains_total">Total</string>
 
+    <string name="gestion_last_day">Último día</string>
+    <string name="gestion_total_short">Patrimonio con efectivo</string>
+    <string name="gestion_position_detail">%1$s part. · %2$s</string>
+    <string name="gestion_show_all_transactions">Ver las %1$d operaciones</string>
+    <string name="gestion_show_fewer_transactions">Ver menos</string>
+    <string name="gestion_hide_amounts">Ocultar importes</string>
+    <string name="gestion_show_amounts">Mostrar importes</string>
+
     <!-- Charts -->
     <string name="range_1m">1M</string>
     <string name="range_3m">3M</string>
@@ -38,6 +46,14 @@
     <string name="chart_no_history">Aún no hay historial de precios para dibujar la gráfica.</string>
 
     <!-- Asset -->
+    <string name="asset_chart_price">Precio</string>
+    <string name="asset_chart_position">Mi posición</string>
+    <string name="asset_section_data">Datos</string>
+    <string name="asset_day_change">Último día</string>
+    <string name="asset_year_range">Rango de 52 semanas</string>
+    <string name="asset_weight">Peso en la cartera</string>
+    <string name="asset_price_date">Precio del</string>
+    <string name="asset_section_accounts">Dónde lo tienes</string>
     <string name="asset_section_position">Tu posición</string>
     <string name="asset_quantity">Participaciones</string>
     <string name="asset_average_price">Precio medio de compra</string>

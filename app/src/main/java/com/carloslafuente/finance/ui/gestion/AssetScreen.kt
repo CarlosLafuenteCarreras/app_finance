@@ -1,10 +1,12 @@
 package com.carloslafuente.finance.ui.gestion
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,10 +52,14 @@ import com.carloslafuente.finance.ui.ChartPoint
 import com.carloslafuente.finance.ui.ChartRange
 import com.carloslafuente.finance.ui.ChartSection
 import com.carloslafuente.finance.ui.formatGain
+import com.carloslafuente.finance.ui.displayMoney
+import com.carloslafuente.finance.ui.formatDate
 import com.carloslafuente.finance.ui.formatMoney
+import com.carloslafuente.finance.ui.formatPercent
 import com.carloslafuente.finance.ui.formatQuantity
 import com.carloslafuente.finance.ui.gainColor
 import com.carloslafuente.finance.ui.parseDecimal
+import com.carloslafuente.finance.ui.valuePoints
 import java.math.BigDecimal
 import java.math.MathContext
 import java.time.LocalDate
@@ -86,7 +95,10 @@ fun AssetScreen(
     var simulating by remember { mutableStateOf(false) }
     var pricing by remember { mutableStateOf(false) }
     var planning by remember { mutableStateOf(false) }
-    val points = remember(state.quotes, range) { pricePoints(state.quotes, range) }
+    var showPosition by rememberSaveable { mutableStateOf(false) }
+    val points = remember(state.quotes, state.positionHistory, range, showPosition) {
+        if (showPosition) valuePoints(state.positionHistory, range) else pricePoints(state.quotes, range)
+    }
     val position = state.position
 
     Scaffold(
@@ -109,21 +121,64 @@ fun AssetScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
+                if (position != null) {
+                    Row(
+                        Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FilterChip(
+                            selected = !showPosition,
+                            onClick = { showPosition = false },
+                            label = { Text(stringResource(R.string.asset_chart_price)) },
+                        )
+                        FilterChip(
+                            selected = showPosition,
+                            onClick = { showPosition = true },
+                            label = { Text(stringResource(R.string.asset_chart_position)) },
+                        )
+                    }
+                }
                 ChartSection(
                     points = points,
                     range = range,
                     onRange = { range = it },
-                    fallbackValue = position?.price,
-                    showBaseline = true,
-                    markers = state.tradeDates.filter { points.isNotEmpty() && it >= points.first().date },
+                    fallbackValue = if (showPosition) position?.value else position?.price,
+                    showBaseline = !showPosition,
+                    markers = if (showPosition) {
+                        emptyList()
+                    } else {
+                        state.tradeDates.filter { points.isNotEmpty() && it >= points.first().date }
+                    },
                 )
-                if (state.tradeDates.isNotEmpty() && points.size >= 2) {
+                if (showPosition && points.size >= 2) ChartLegend()
+                if (!showPosition && state.tradeDates.isNotEmpty() && points.size >= 2) {
                     Text(
                         stringResource(R.string.asset_chart_markers),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
+                }
+            }
+            if (state.quotes.size >= 2) {
+                item { AssetData(state) }
+            }
+            if (state.holdings.size > 1) {
+                item {
+                    SectionHeader(R.string.asset_section_accounts)
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.holdings.forEach { (account, quantity) ->
+                            Row(Modifier.fillMaxWidth()) {
+                                Text(
+                                    account,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(formatQuantity(quantity), style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
                 }
             }
             item {
@@ -141,10 +196,10 @@ fun AssetScreen(
                         DetailLine(R.string.asset_quantity, formatQuantity(position.quantity))
                         DetailLine(
                             R.string.asset_average_price,
-                            formatMoney(position.cost.divide(position.quantity, MathContext.DECIMAL64)),
+                            displayMoney(position.cost.divide(position.quantity, MathContext.DECIMAL64)),
                         )
-                        DetailLine(R.string.asset_cost, formatMoney(position.cost))
-                        position.value?.let { DetailLine(R.string.asset_value, formatMoney(it)) }
+                        DetailLine(R.string.asset_cost, displayMoney(position.cost))
+                        position.value?.let { DetailLine(R.string.asset_value, displayMoney(it)) }
                         position.gain?.let { gain ->
                             DetailLine(
                                 R.string.asset_gain,
@@ -208,6 +263,42 @@ fun AssetScreen(
     }
 }
 
+/** Last day's move, where the price sits in its 52-week range, and the asset's weight. */
+@Composable
+private fun AssetData(state: AssetUiState) {
+    val last = state.quotes.last()
+    val previous = state.quotes[state.quotes.size - 2]
+    val year = state.quotes.filter { it.date >= last.date.minusYears(1) }
+    val low = year.minOf { it.price }
+    val high = year.maxOf { it.price }
+    val change = last.price - previous.price
+    SectionHeader(R.string.asset_section_data)
+    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DetailLine(
+            R.string.asset_day_change,
+            formatPercent(change.toDouble() / previous.price.toDouble()),
+            color = gainColor(change.signum()),
+        )
+        // Prices of the asset are public, so they stay visible in privacy mode.
+        DetailLine(R.string.asset_year_range, formatMoney(low) + " – " + formatMoney(high))
+        if (high > low) {
+            val fraction = ((last.price - low).toFloat() / (high - low).toFloat()).coerceIn(0f, 1f)
+            val track = MaterialTheme.colorScheme.surfaceContainerHighest
+            val ink = MaterialTheme.colorScheme.onSurface
+            val surface = MaterialTheme.colorScheme.background
+            Canvas(Modifier.fillMaxWidth().height(12.dp)) {
+                val y = size.height / 2
+                drawLine(track, Offset(0f, y), Offset(size.width, y), strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
+                val x = (size.width * fraction).coerceIn(6.dp.toPx(), size.width - 6.dp.toPx())
+                drawCircle(surface, 6.dp.toPx(), Offset(x, y))
+                drawCircle(ink, 4.dp.toPx(), Offset(x, y))
+            }
+        }
+        state.weight?.let { DetailLine(R.string.asset_weight, formatWeight(BigDecimal(it * 100))) }
+        DetailLine(R.string.asset_price_date, formatDate(last.date))
+    }
+}
+
 @Composable
 internal fun DetailLine(@StringRes label: Int, value: String, color: Color = Color.Unspecified, emphasized: Boolean = false) {
     val style = if (emphasized) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge
@@ -255,11 +346,11 @@ private fun SaleSimulatorDialog(position: PositionRow, transactions: List<Transa
                 if (simulation == null) {
                     Text(stringResource(R.string.sale_invalid), color = MaterialTheme.colorScheme.error)
                 } else {
-                    DetailLine(R.string.sale_proceeds, formatMoney(simulation.proceeds))
-                    DetailLine(R.string.sale_cost, formatMoney(simulation.cost))
-                    DetailLine(R.string.sale_gain, formatMoney(simulation.gain))
-                    DetailLine(R.string.sale_tax, formatMoney(simulation.tax))
-                    DetailLine(R.string.sale_after_tax, formatMoney(simulation.afterTax), emphasized = true)
+                    DetailLine(R.string.sale_proceeds, displayMoney(simulation.proceeds))
+                    DetailLine(R.string.sale_cost, displayMoney(simulation.cost))
+                    DetailLine(R.string.sale_gain, displayMoney(simulation.gain))
+                    DetailLine(R.string.sale_tax, displayMoney(simulation.tax))
+                    DetailLine(R.string.sale_after_tax, displayMoney(simulation.afterTax), emphasized = true)
                     if (simulation.lossDeferred) {
                         Text(stringResource(R.string.sale_loss_deferred), color = MaterialTheme.colorScheme.error)
                     }

@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.carloslafuente.finance.R
 import com.carloslafuente.finance.data.local.PlanRole
 import com.carloslafuente.finance.domain.PlanLine
-import com.carloslafuente.finance.ui.formatMoney
+import com.carloslafuente.finance.ui.displayMoney
 import com.carloslafuente.finance.ui.parseDecimal
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -107,7 +107,7 @@ private fun PlanItem(line: PlanLine, scale: Float, onClick: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             if (gap != null) {
-                val amount = formatMoney(gap.abs())
+                val amount = displayMoney(gap.abs())
                 Text(
                     stringResource(
                         when {

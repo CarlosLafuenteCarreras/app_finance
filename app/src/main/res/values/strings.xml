@@ -175,7 +175,42 @@
     <string name="error_oversold">Con este cambio se vendería más de lo que la cuenta tenía en esa fecha.</string>
 
     <!-- Magia -->
-    <string name="magia_empty_title">Aún no hay magia</string>
-    <string name="magia_empty_message">Los análisis con IA llegarán cuando la gestión de la cartera esté lista.</string>
+    <string name="magia_key_title">Conecta la IA</string>
+    <string name="magia_key_message">Pega tu clave de API de Anthropic (se crea en console.anthropic.com). Se guarda cifrada en este móvil y solo se usa para llamar a Claude Haiku.</string>
+    <string name="magia_key_label">Clave de API</string>
+    <string name="magia_key_forget">Quitar la clave de API</string>
+    <string name="magia_import_title">Añadir operaciones sin teclear</string>
+    <string name="magia_import_message">Pega el texto de una orden o sube capturas de tu bróker, también de tu cartera actual. La IA lo lee y tú confirmas antes de guardar nada.</string>
+    <string name="magia_import_text">Texto de la orden o del extracto</string>
+    <string name="magia_import_add_images">Añadir capturas</string>
+    <string name="magia_import_clear_images">Quitar</string>
+    <plurals name="magia_import_images">
+        <item quantity="one">%1$d captura</item>
+        <item quantity="other">%1$d capturas</item>
+    </plurals>
+    <string name="magia_import_extract">Leer operaciones</string>
+    <string name="magia_import_working">Leyendo… suele tardar unos segundos.</string>
+    <plurals name="magia_saved">
+        <item quantity="one">%1$d operación guardada. Ya está en Gestión.</item>
+        <item quantity="other">%1$d operaciones guardadas. Ya están en Gestión.</item>
+    </plurals>
+    <string name="magia_error_key">La clave de API no es válida. Quítala y pega una nueva.</string>
+    <string name="magia_error_rate">Demasiadas peticiones seguidas. Espera un momento y vuelve a intentarlo.</string>
+    <string name="magia_error_network">No se pudo conectar. Revisa la conexión.</string>
+    <string name="magia_error_declined">La IA no ha querido procesar este contenido.</string>
+    <string name="magia_error_unreadable">No se pudo leer nada útil. Prueba con otra captura o con el texto.</string>
+    <string name="magia_review_title">Revisa antes de guardar</string>
+    <string name="magia_review_empty">No he encontrado ninguna operación.</string>
+    <string name="magia_review_no_date">sin fecha: se guardará con la de hoy</string>
+    <string name="magia_review_account">Cuenta para las que no la indican</string>
+    <plurals name="magia_review_save">
+        <item quantity="one">Guardar %1$d operación</item>
+        <item quantity="other">Guardar %1$d operaciones</item>
+    </plurals>
+    <string name="magia_review_discard">Descartar</string>
+    <string name="magia_problem_asset">Falta el nombre del activo.</string>
+    <string name="magia_problem_quantity">Falta la cantidad.</string>
+    <string name="magia_problem_price">Falta el precio de compra.</string>
+    <string name="magia_problem_amount">Falta el importe.</string>
     <string name="magia_disclaimer">Nada de lo que aparece aquí es una recomendación de inversión.</string>
 </resources>

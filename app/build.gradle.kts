@@ -60,6 +60,7 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
+    implementation(libs.anthropic.java)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)

@@ -10,6 +10,7 @@ navigationCompose = "2.10.2"
 coreKtx = "1.19.1"
 coroutines = "1.11.0"
 okhttp = "5.5.0"
+anthropic = "3.3.0"
 serializationJson = "1.13.0"
 junit = "4.13.2"
 
@@ -34,6 +35,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+anthropic-java = { group = "com.anthropic", name = "anthropic-java", version.ref = "anthropic" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }

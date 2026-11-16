@@ -1,6 +1,8 @@
 package com.carloslafuente.finance
 
 import android.app.Application
+import com.carloslafuente.finance.data.ai.ApiKeyStore
+import com.carloslafuente.finance.data.ai.OrderExtractor
 import com.carloslafuente.finance.data.backup.BackupRepository
 import com.carloslafuente.finance.data.local.AppDatabase
 import com.carloslafuente.finance.data.plan.PlanImporter
@@ -18,6 +20,10 @@ class AppContainer(private val application: Application) {
     val database: AppDatabase by lazy { AppDatabase.build(application) }
 
     val backupRepository: BackupRepository by lazy { BackupRepository(database, application.contentResolver) }
+
+    val apiKeyStore: ApiKeyStore by lazy { ApiKeyStore(application) }
+
+    val orderExtractor: OrderExtractor by lazy { OrderExtractor(application.contentResolver) }
 
     val planImporter: PlanImporter by lazy { PlanImporter(database, application.contentResolver) }
 

@@ -5,8 +5,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.Instant
@@ -73,6 +75,23 @@ fun parseFtTearsheet(html: String): Quote? = runCatching {
     )
 }.getOrNull()
 
+private val ftXid = Regex("""xid&quot;:&quot;(\d+)&quot;""")
+
+/** Internal id the FT chart API needs, embedded in the tearsheet HTML. */
+fun parseFtXid(html: String): String? = ftXid.find(html)?.groupValues?.get(1)
+
+/** FT chart series JSON: parallel `Dates` and `Elements[0].ComponentSeries[Type=Close].Values` arrays. */
+fun parseFtSeries(json: String): List<Quote> = runCatching {
+    val root = Json.parseToJsonElement(json).jsonObject
+    val dates = root.getValue("Dates").jsonArray
+    val closes = root.getValue("Elements").jsonArray.first().jsonObject.getValue("ComponentSeries").jsonArray
+        .first { it.jsonObject.getValue("Type").jsonPrimitive.content == "Close" }
+        .jsonObject.getValue("Values").jsonArray
+    dates.zip(closes) { date, close ->
+        Quote(LocalDate.parse(date.jsonPrimitive.content.take(10)), BigDecimal(close.jsonPrimitive.content))
+    }
+}.getOrDefault(emptyList())
+
 class PriceSources(private val client: OkHttpClient) {
 
     /** Tries the sources that fit the asset type in order; null when none of them has a usable price. */
@@ -83,8 +102,14 @@ class PriceSources(private val client: OkHttpClient) {
         AssetType.BOND -> null
     }
 
-    /** Daily price history of an exchange-traded asset; empty when it cannot be fetched. */
-    fun history(isin: String): List<Quote> {
+    /** Daily price history, oldest first; empty when it cannot be fetched. */
+    fun history(type: AssetType, isin: String): List<Quote> = when (type) {
+        AssetType.FUND -> financialTimesHistory(isin)
+        AssetType.ETF, AssetType.STOCK -> lsExchangeHistory(isin)
+        AssetType.BOND -> emptyList()
+    }
+
+    private fun lsExchangeHistory(isin: String): List<Quote> {
         val id = get("https://www.ls-tc.de/_rpc/json/.lstc/instrument/search/main?q=$isin&localeId=2")
             ?.let(::parseLsInstrumentId) ?: return emptyList()
         return get("https://www.ls-tc.de/_rpc/json/instrument/chart/dataForInstrument?instrumentId=$id")
@@ -104,14 +129,37 @@ class PriceSources(private val client: OkHttpClient) {
     private fun financialTimes(isin: String): Quote? =
         get("https://markets.ft.com/data/funds/tearsheet/summary?s=$isin:EUR")?.let(::parseFtTearsheet)
 
-    private fun get(url: String): String? = try {
-        val request = Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
-        client.newCall(request).execute().use { response -> if (response.isSuccessful) response.body.string() else null }
-    } catch (e: IOException) {
-        null
+    private fun financialTimesHistory(isin: String): List<Quote> {
+        val xid = get("https://markets.ft.com/data/funds/tearsheet/summary?s=$isin:EUR")
+            ?.takeIf { parseFtTearsheet(it) != null } // rejects share classes not quoted in EUR
+            ?.let(::parseFtXid) ?: return emptyList()
+        val body = """{"days":$HISTORY_DAYS,"dataPeriod":"Day","dataInterval":1,"realtime":false,""" +
+            """"returnDateType":"ISO8601","elements":[{"Type":"price","Symbol":"$xid"}]}"""
+        return get("https://markets.ft.com/data/chartapi/series", body)?.let(::parseFtSeries).orEmpty()
+    }
+
+    // These sites answer with a server error every now and then (FT returns 520), so a failed
+    // request is tried again; a client error means the instrument is not there and is final.
+    private fun get(url: String, jsonBody: String? = null): String? {
+        val request = Request.Builder().url(url).header("User-Agent", USER_AGENT)
+            .apply { if (jsonBody != null) post(jsonBody.toRequestBody("application/json".toMediaType())) }
+            .build()
+        repeat(ATTEMPTS) {
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) return response.body.string()
+                    if (response.code < 500) return null
+                }
+            } catch (e: IOException) {
+                // Try again.
+            }
+        }
+        return null
     }
 
     private companion object {
+        const val ATTEMPTS = 3
+        const val HISTORY_DAYS = 1825
         const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
     }

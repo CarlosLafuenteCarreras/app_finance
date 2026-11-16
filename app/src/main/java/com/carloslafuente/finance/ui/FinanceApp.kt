@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.carloslafuente.finance.R
+import com.carloslafuente.finance.ui.gestion.AssetScreen
 import com.carloslafuente.finance.ui.gestion.GestionScreen
 import com.carloslafuente.finance.ui.gestion.TransactionFormScreen
 import com.carloslafuente.finance.ui.magia.MagiaScreen
@@ -35,6 +36,8 @@ private enum class Tab(@StringRes val label: Int, val icon: ImageVector) {
 
 private const val HOME = "home"
 const val TRANSACTION_ID_ARG = "transactionId"
+const val ASSET_ID_ARG = "assetId"
+private const val ASSET = "asset/{$ASSET_ID_ARG}"
 private const val TRANSACTION = "transaction?$TRANSACTION_ID_ARG={$TRANSACTION_ID_ARG}"
 
 @Composable
@@ -42,7 +45,19 @@ fun FinanceApp() {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = HOME) {
         composable(HOME) {
-            HomeTabs(onOpenTransaction = { id -> navController.navigate("transaction?$TRANSACTION_ID_ARG=$id") })
+            HomeTabs(
+                onOpenTransaction = { id -> navController.navigate("transaction?$TRANSACTION_ID_ARG=$id") },
+                onOpenAsset = { id -> navController.navigate("asset/$id") },
+            )
+        }
+        composable(
+            route = ASSET,
+            arguments = listOf(navArgument(ASSET_ID_ARG) { type = NavType.LongType }),
+        ) {
+            AssetScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTransaction = { id -> navController.navigate("transaction?$TRANSACTION_ID_ARG=$id") },
+            )
         }
         composable(
             route = TRANSACTION,
@@ -55,7 +70,7 @@ fun FinanceApp() {
 
 /** [onOpenTransaction] receives 0 for a new transaction. */
 @Composable
-private fun HomeTabs(onOpenTransaction: (Long) -> Unit) {
+private fun HomeTabs(onOpenTransaction: (Long) -> Unit, onOpenAsset: (Long) -> Unit) {
     var selected by rememberSaveable { mutableStateOf(Tab.GESTION) }
     Scaffold(
         bottomBar = {
@@ -72,7 +87,7 @@ private fun HomeTabs(onOpenTransaction: (Long) -> Unit) {
         },
     ) { innerPadding ->
         when (selected) {
-            Tab.GESTION -> GestionScreen(onOpenTransaction, Modifier.padding(innerPadding))
+            Tab.GESTION -> GestionScreen(onOpenTransaction, onOpenAsset, Modifier.padding(innerPadding))
             Tab.MAGIA -> MagiaScreen(Modifier.padding(innerPadding))
         }
     }

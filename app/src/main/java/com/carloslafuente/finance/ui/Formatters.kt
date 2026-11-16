@@ -23,6 +23,9 @@ private val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 fun formatMoney(value: BigDecimal): String =
     NumberFormat.getCurrencyInstance(spanish).apply { currency = Currency.getInstance("EUR") }.format(value)
 
+/** Money with an explicit sign, for gains and losses. */
+fun formatSignedMoney(value: BigDecimal): String = (if (value.signum() >= 0) "+" else "") + formatMoney(value)
+
 fun formatQuantity(value: BigDecimal): String =
     DecimalFormat("#,##0.######", DecimalFormatSymbols(spanish)).format(value)
 

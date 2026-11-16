@@ -13,16 +13,21 @@ import com.carloslafuente.finance.data.local.AppDatabase
 import com.carloslafuente.finance.data.local.TransactionEntity
 import com.carloslafuente.finance.data.local.TransactionType
 import com.carloslafuente.finance.data.prices.PriceRepository
+import com.carloslafuente.finance.data.prices.Quote
+import com.carloslafuente.finance.domain.ValuePoint
 import com.carloslafuente.finance.domain.annualizedReturn
 import com.carloslafuente.finance.domain.benchmarkValue
 import com.carloslafuente.finance.domain.buildLedger
 import com.carloslafuente.finance.domain.cashEffect
 import com.carloslafuente.finance.domain.investmentFlows
+import com.carloslafuente.finance.domain.portfolioHistory
 import com.carloslafuente.finance.ui.financeContainer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -64,6 +69,16 @@ data class Performance(
     val benchmarkAnnualized: Double?,
 )
 
+/** Money made or lost so far, by where it comes from. */
+data class Gains(
+    /** Open positions at today's price against what they cost. */
+    val unrealized: BigDecimal,
+    /** Closed sales, net of fees. */
+    val realized: BigDecimal,
+    /** Dividends and interest received, net of withholding. */
+    val income: BigDecimal,
+)
+
 data class RefreshState(val running: Boolean = false, val failed: List<String> = emptyList())
 
 data class GestionUiState(
@@ -76,6 +91,10 @@ data class GestionUiState(
     /** Raw ledger, for the sale simulator. */
     val ledgerTransactions: List<TransactionEntity> = emptyList(),
     val performance: Performance? = null,
+    val positionsValue: BigDecimal = BigDecimal.ZERO,
+    val gains: Gains? = null,
+    /** Daily value of the positions since the first trade. */
+    val history: List<ValuePoint> = emptyList(),
     val hasOversold: Boolean = false,
     val refresh: RefreshState = RefreshState(),
     /** Outcome of the last backup export or import. */
@@ -94,13 +113,14 @@ class GestionViewModel(
         db.accountDao().observeAll(),
         db.assetDao().observeAll(),
         db.transactionDao().observeAll(),
-        db.priceDao().observeLatest(),
+        db.priceDao().observeAll(),
         combine(refresh, backupMessage, priceRepository.benchmark, ::Triple),
     ) { accounts, assets, transactions, prices, (refresh, backupMessage, benchmark) ->
         val ledger = buildLedger(transactions)
         val accountNames = accounts.associate { it.id to it.name }
         val assetsById = assets.associateBy { it.id }
-        val latestPrice = prices.associateBy { it.assetId }
+        val quotes = prices.groupBy({ it.assetId }, { Quote(it.date, it.price) })
+        val latestPrice = quotes.mapValues { it.value.last() }
         val positions = ledger.lots.map { (assetId, lots) ->
             val quantity = lots.sumOf { it.quantity }
             val price = latestPrice[assetId]
@@ -136,6 +156,15 @@ class GestionViewModel(
                 )
             },
             ledgerTransactions = transactions,
+            positionsValue = positionsValue,
+            gains = if (flows.isEmpty()) null else Gains(
+                unrealized = positions.sumOf { it.gain ?: BigDecimal.ZERO },
+                realized = ledger.realized.sumOf { it.gain },
+                income = transactions
+                    .filter { it.type == TransactionType.DIVIDEND || it.type == TransactionType.INTEREST }
+                    .sumOf { it.cashEffect() },
+            ),
+            history = portfolioHistory(transactions, quotes),
             performance = if (flows.isEmpty()) null else Performance(
                 positionsValue = positionsValue,
                 benchmarkValue = benchmarkNow,
@@ -146,7 +175,7 @@ class GestionViewModel(
             refresh = refresh,
             backupMessage = backupMessage,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GestionUiState())
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GestionUiState())
 
     init {
         refreshPrices()
@@ -159,10 +188,6 @@ class GestionViewModel(
             val failed = priceRepository.refresh()
             refresh.value = RefreshState(running = false, failed = failed)
         }
-    }
-
-    fun setManualPrice(assetId: Long, price: BigDecimal) = viewModelScope.launch {
-        priceRepository.setManualPrice(assetId, price)
     }
 
     fun exportBackup(uri: Uri) = viewModelScope.launch {

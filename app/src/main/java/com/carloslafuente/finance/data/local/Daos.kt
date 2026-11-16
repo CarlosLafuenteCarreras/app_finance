@@ -73,9 +73,15 @@ interface TransactionDao {
 
 @Dao
 interface PriceDao {
-    @Query("SELECT * FROM prices p WHERE date = (SELECT MAX(date) FROM prices WHERE assetId = p.assetId)")
-    fun observeLatest(): Flow<List<PriceEntity>>
+    @Query("SELECT * FROM prices ORDER BY date")
+    fun observeAll(): Flow<List<PriceEntity>>
+
+    @Query("SELECT * FROM prices WHERE assetId = :assetId ORDER BY date")
+    fun observeForAsset(assetId: Long): Flow<List<PriceEntity>>
 
     @Upsert
     suspend fun upsert(price: PriceEntity)
+
+    @Upsert
+    suspend fun upsertAll(prices: List<PriceEntity>)
 }

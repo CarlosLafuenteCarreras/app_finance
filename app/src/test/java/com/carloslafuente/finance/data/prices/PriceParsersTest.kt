@@ -67,6 +67,23 @@ class PriceParsersTest {
     }
 
     @Test
+    fun `FT chart series pairs dates with closes`() {
+        val html = """<section data-mod-config="{&quot;xid&quot;:&quot;72575967&quot;,&quot;assetClass&quot;:&quot;Fund&quot;}">"""
+        val json = """{"Dates":["2026-11-11T00:00:00","2026-11-12T00:00:00"],"Elements":[{"Currency":"EUR","ComponentSeries":[""" +
+            """{"Type":"Open","Values":[1.0,2.0]},{"Type":"Close","Values":[251.43,251.54]}]}]}"""
+
+        assertEquals("72575967", parseFtXid(html))
+        assertEquals(
+            listOf(
+                Quote(LocalDate.parse("2026-11-11"), BigDecimal("251.43")),
+                Quote(LocalDate.parse("2026-11-12"), BigDecimal("251.54")),
+            ),
+            parseFtSeries(json),
+        )
+        assertEquals(emptyList<Quote>(), parseFtSeries("""{"Dates":[],"Elements":[]}"""))
+    }
+
+    @Test
     fun `unexpected responses yield no quote`() {
         assertNull(parseJustEtfQuote("<html>blocked</html>"))
         assertNull(parseLsChart("""{"series":{}}"""))
